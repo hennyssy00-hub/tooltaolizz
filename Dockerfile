@@ -1,9 +1,10 @@
-﻿# Stage 1: Build Frontend Next.js
+# Stage 1: Build Frontend Next.js
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm install
 COPY frontend/ ./
+RUN mkdir -p /app/frontend/public
 RUN npm run build
 
 # Stage 2: Final Production Runner (Python + Node.js)
