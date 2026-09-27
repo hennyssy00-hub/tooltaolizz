@@ -31,7 +31,7 @@ RUN mkdir -p /app/backend/uploads
 COPY --from=frontend-builder /app/frontend/package*.json ./frontend/
 COPY --from=frontend-builder /app/frontend/.next ./frontend/.next
 COPY --from=frontend-builder /app/frontend/node_modules ./frontend/node_modules
-COPY --from=frontend-builder /app/frontend/public ./frontend/public
+RUN mkdir -p ./frontend/public
 COPY --from=frontend-builder /app/frontend/next.config.js ./frontend/
 
 # 3. Entrypoint startup script
