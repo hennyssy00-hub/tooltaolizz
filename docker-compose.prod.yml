@@ -1,0 +1,35 @@
+﻿version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: betguard-backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///app/data/casino_guard.db
+      - UPLOAD_DIR=/app/uploads
+      - SECRET_KEY=betguard-prod-secret-key-2026
+    volumes:
+      - backend_data:/app/data
+      - upload_data:/app/uploads
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: betguard-frontend
+    restart: always
+    ports:
+      - "80:3000"
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  backend_data:
+  upload_data:
