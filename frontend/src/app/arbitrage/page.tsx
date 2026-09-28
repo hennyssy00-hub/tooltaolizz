@@ -303,31 +303,89 @@ export default function ArbitragePage() {
       {/* Step 2: Config */}
       {platforms.length > 0 && !result && (
         <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <span className="w-7 h-7 bg-orange-600 rounded-full flex items-center justify-center text-sm font-bold">2</span>
-            Cấu hình quét
-          </h2>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-slate-700">
+            <div>
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <span className="w-7 h-7 bg-orange-600 rounded-full flex items-center justify-center text-sm font-bold">2</span>
+                Cấu hình & Mức độ nhạy của hệ thống
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">Chọn chế độ độ nhạy được tối ưu sẵn hoặc tùy chỉnh thủ công bên dưới</p>
+            </div>
+
+            {/* Quick Sensitivity Presets */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setConfig({
+                  internal_min_rounds: 2,
+                  external_min_rounds: 3,
+                  min_equal_stake_ratio: 0.80,
+                  max_stake_diff_pct: 0.15,
+                  min_payout_pct: 0.85,
+                  max_payout_pct: 1.05,
+                })}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-600/20 text-red-300 border border-red-500/50 hover:bg-red-600/30 flex items-center gap-1.5 transition-all shadow-sm"
+                title="Bắt sớm mọi dấu hiệu đối đả từ 2-3 ván, quét rộng cả cược lệch nhẹ"
+              >
+                <span>🔥 Siêu Nhạy (Cao Nhất)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setConfig({
+                  internal_min_rounds: 3,
+                  external_min_rounds: 4,
+                  min_equal_stake_ratio: 0.90,
+                  max_stake_diff_pct: 0.10,
+                  min_payout_pct: 0.90,
+                  max_payout_pct: 1.00,
+                })}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600/20 text-blue-300 border border-blue-500/50 hover:bg-blue-600/30 flex items-center gap-1.5 transition-all shadow-sm"
+                title="Chuẩn 15 Quy tắc đối đả (Nội >= 3, Ngoại >= 4, Bằng tiền >= 90%, Lệch <= 10%)"
+              >
+                <span>⭐ Chuẩn 15 Quy Tắc</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setConfig({
+                  internal_min_rounds: 3,
+                  external_min_rounds: 4,
+                  min_equal_stake_ratio: 1.00,
+                  max_stake_diff_pct: 0.05,
+                  min_payout_pct: 0.90,
+                  max_payout_pct: 1.00,
+                })}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600/20 text-emerald-300 border border-emerald-500/50 hover:bg-emerald-600/30 flex items-center gap-1.5 transition-all shadow-sm"
+                title="Chỉ bắt các cặp cược đúng 100% bằng tiền tuyệt đối"
+              >
+                <span>🎯 Bằng Tiền Tuyệt Đối (100%)</span>
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div>
               <label className="text-slate-400 text-sm block mb-1">内对打 ván tối thiểu</label>
               <input type="number" min={1} value={config.internal_min_rounds}
                 onChange={e => setConfig(c => ({...c, internal_min_rounds: +e.target.value}))}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white" />
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white font-mono" />
             </div>
             <div>
               <label className="text-slate-400 text-sm block mb-1">外对打 ván tối thiểu</label>
               <input type="number" min={1} value={config.external_min_rounds}
                 onChange={e => setConfig(c => ({...c, external_min_rounds: +e.target.value}))}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white" />
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white font-mono" />
             </div>
             <div>
               <label className="text-slate-400 text-sm block mb-1">Bằng tiền / Ván tối thiểu</label>
               <select value={config.min_equal_stake_ratio}
                 onChange={e => setConfig(c => ({...c, min_equal_stake_ratio: +e.target.value}))}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white">
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white font-mono">
+                <option value={0.70}>70%</option>
                 <option value={0.80}>80%</option>
                 <option value={0.85}>85%</option>
-                <option value={0.90}>90%</option>
+                <option value={0.90}>90% (Chuẩn)</option>
                 <option value={0.95}>95%</option>
                 <option value={1.00}>100%</option>
               </select>
@@ -336,10 +394,10 @@ export default function ArbitragePage() {
               <label className="text-slate-400 text-sm block mb-1">Chênh cược tối đa</label>
               <select value={config.max_stake_diff_pct}
                 onChange={e => setConfig(c => ({...c, max_stake_diff_pct: +e.target.value}))}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white">
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white font-mono">
                 <option value={0.05}>5%</option>
-                <option value={0.10}>10%</option>
-                <option value={0.15}>15%</option>
+                <option value={0.10}>10% (Chuẩn)</option>
+                <option value={0.15}>15% (Nhạy cao)</option>
                 <option value={0.20}>20%</option>
               </select>
             </div>
@@ -347,10 +405,21 @@ export default function ArbitragePage() {
               <label className="text-slate-400 text-sm block mb-1">Payout tối thiểu</label>
               <select value={config.min_payout_pct}
                 onChange={e => setConfig(c => ({...c, min_payout_pct: +e.target.value}))}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white">
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white font-mono">
+                <option value={0.80}>80%</option>
                 <option value={0.85}>85%</option>
-                <option value={0.90}>90%</option>
+                <option value={0.90}>90% (Chuẩn)</option>
                 <option value={0.95}>95%</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-slate-400 text-sm block mb-1">Payout tối đa</label>
+              <select value={config.max_payout_pct}
+                onChange={e => setConfig(c => ({...c, max_payout_pct: +e.target.value}))}
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white font-mono">
+                <option value={1.00}>100% (Chuẩn 1:1)</option>
+                <option value={1.05}>105% (Dung sai phụ)</option>
+                <option value={1.10}>110%</option>
               </select>
             </div>
           </div>
