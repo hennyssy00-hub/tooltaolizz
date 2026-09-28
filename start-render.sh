@@ -1,13 +1,14 @@
 #!/bin/bash
 set -e
 
-echo "Starting BetGuard Backend (FastAPI)..."
+echo "[BetGuard] Starting Backend (FastAPI)..."
 cd /app/backend
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 &
 
-echo "Waiting for backend to initialize..."
+echo "[BetGuard] Waiting for backend to initialize..."
 sleep 3
 
-echo "Starting BetGuard Frontend on port ${PORT:-10000}..."
+echo "[BetGuard] Starting Frontend..."
 cd /app/frontend
-exec ./node_modules/.bin/next start -p ${PORT:-10000} -H 0.0.0.0
+PORT_NUM=${PORT:-10000}
+exec ./node_modules/.bin/next start -p "$PORT_NUM" -H 0.0.0.0

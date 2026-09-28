@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
   LayoutDashboard, Upload, History, 
-  AlertTriangle, Users, ShieldBan, Network, ShieldCheck, Dices, Trophy, Globe
+  AlertTriangle, Users, ShieldBan, Network, ShieldCheck, Dices, Trophy, Globe, Shield
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePlatform } from '@/context/PlatformContext';
@@ -17,6 +17,7 @@ const navItems = [
   { href: '/accounts', icon: Users, label: 'Tài khoản' },
   { href: '/blacklist', icon: ShieldBan, label: 'Danh sách đen' },
   { href: '/network', icon: Network, label: 'Mạng lưới' },
+  { href: '/arbitrage', icon: Shield, label: 'Quét Đối Đả' },
 ];
 
 export function Sidebar() {

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from app.database import engine, Base
 import app.models
-from app.api import upload, scan, dashboard, alerts, accounts, blacklist, reports, platform_configs
+from app.api import upload, scan, dashboard, alerts, accounts, blacklist, reports, platform_configs, arbitrage
 from contextlib import asynccontextmanager
 from datetime import datetime
 
@@ -183,4 +183,5 @@ app.include_router(accounts.router, prefix="/api/accounts", tags=["Accounts"])
 app.include_router(blacklist.router, prefix="/api/blacklist", tags=["Blacklist"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
 app.include_router(platform_configs.router, prefix="/api/platform-configs", tags=["Platform Configs"])
+app.include_router(arbitrage.router, tags=["Arbitrage"])
 
