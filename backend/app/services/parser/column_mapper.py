@@ -11,34 +11,37 @@ class ColumnMapper:
     # Standard field -> list of known keywords (lowercase)
     KEYWORDS: dict[str, list[str]] = {
         'round_id': [
-            'round', 'ván', 'phiên', 'mã ván', 'game no', '游戏编号',
+            '三方游戏局号', '游戏局号', '局号', '三方局号', 'round', 'ván', 'phiên', 'mã ván', 'game no', '游戏编号',
             'round id', 'round no', 'round_id', 'roundid', 'game_no',
-            'bill no', 'bet id', 'wager id',
+            'bill no', 'bet id', 'wager id', '注单号',
         ],
         'player_id': [
-            'user', 'player', 'username', 'tên', 'member', '会员',
+            '用户名', '账号', '帐号', 'user', 'player', 'username', 'tên', 'member', '会员',
             'account', 'tài khoản', 'player_id', 'userid', 'user_id',
-            'login', 'memberid', 'member_id', '会员账号',
+            'login', 'memberid', 'member_id', '会员账号', '会员名称',
         ],
         'game_type': [
-            'game', 'trò', 'loại game', 'game type', '游戏类型', 'product',
+            'game', 'trò', 'loại game', 'game type', '游戏类型', '游戏种类', 'product',
             'game_type', 'gametype', 'category', 'game name', 'gamename',
         ],
         'bet_choice': [
+            '投注区域', '下注区域', '投注内容', '下注内容', '投注类型', '下注类型',
             'bet', 'cửa', 'choice', 'selection', '下注', 'bet on', 'bet type',
             'bet_choice', 'betchoice', 'bet_type', 'wager', 'bet content',
         ],
         'stake': [
-            'stake', 'tiền', 'amount', 'bet amount', '下注金额', 'số tiền',
+            '投注额', '下注额', '投注金额', '下注金额',
+            'stake', 'tiền', 'amount', 'bet amount', 'số tiền',
             'cược', 'bet_amount', 'betamount', 'wager amount', 'valid bet',
             'valid_bet', 'turnover',
         ],
         'payout': [
-            'payout', 'win', 'thắng', 'winloss', 'win/loss', '输赢',
+            '游戏输赢', '输赢', '输赢金额', '盈亏', '派彩',
+            'payout', 'win', 'thắng', 'winloss', 'win/loss',
             'profit', 'win_loss', 'win amount', 'winamount', 'net',
         ],
         'bet_timestamp': [
-            'time', 'date', 'thời gian', 'ngày', 'bet time', '下注时间',
+            '投注时间', '下注时间', 'time', 'date', 'thời gian', 'ngày', 'bet time',
             'timestamp', 'bet_time', 'bettime', 'created', 'bet date',
             'transaction time', 'settle time',
         ],
@@ -51,7 +54,7 @@ class ColumnMapper:
             'table_id', 'tableid', 'table_name', 'tablename', 'room',
         ],
         'provider': [
-            'provider', 'sảnh', 'platform', 'vendor', '平台',
+            '厂商', '游戏厂商', 'provider', 'sảnh', 'platform', 'vendor', '平台',
             'game provider', 'supplier', 'lobby', 'bookmaker', 'nhà cái',
         ],
         'odds': [
