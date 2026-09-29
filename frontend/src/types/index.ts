@@ -25,6 +25,7 @@ export interface BetBrief {
   ipAddress?: string;
   deviceId?: string;
   agentId?: string;
+  provider?: string;
   betTypeDetail?: string;
 }
 

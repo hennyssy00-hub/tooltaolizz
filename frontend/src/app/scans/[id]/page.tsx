@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { ScanSummaryBar } from '@/components/scan/ScanSummaryBar';
 import { AlertFilterTabs } from '@/components/scan/AlertFilterTabs';
 import { EvidencePair } from '@/components/scan/EvidencePair';
+import { HeadToHeadTable } from '@/components/scan/HeadToHeadTable';
 import { FraudTimeline } from '@/components/scan/FraudTimeline';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
@@ -13,6 +14,7 @@ import Link from 'next/link';
 
 export default function ScanDetailPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState('all');
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   
   const { data: scan, isLoading: scanLoading, refetch: refetchScan } = useQuery({
     queryKey: ['scan', params.id],
@@ -80,40 +82,76 @@ export default function ScanDetailPage({ params }: { params: { id: string } }) {
 
       <ScanSummaryBar scan={safeScan} />
       
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-2 space-y-6">
-          <div className="card">
-            <AlertFilterTabs 
-              activeTab={activeTab} 
-              onTabChange={setActiveTab} 
-              counts={counts} 
-            />
-            
-            <div className="space-y-6">
-              {filteredAlerts.length > 0 ? (
-                filteredAlerts.map((alert, idx) => (
-                  <EvidencePair key={alert?.id || idx} alert={alert} />
-                ))
-              ) : (
-                <div className="py-16 text-center text-slate-400">
-                  <p className="text-base font-medium text-slate-300 mb-1">
-                    {activeTab === 'all' ? 'Chưa phát hiện hành vi gian lận nào trong phiên này' : 'Không có cảnh báo nào trong mức độ này'}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    Hệ thống đã rà soát toàn bộ các ván cược đối đầu và chỉ số bất thường.
-                  </p>
-                </div>
-              )}
+      {/* View Mode Switcher */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-850 p-2.5 px-4 rounded-xl border border-slate-750">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">Chế độ hiển thị:</span>
+          <div className="inline-flex rounded-lg bg-slate-900 p-1 border border-slate-750">
+            <button
+              onClick={() => setViewMode('table')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                viewMode === 'table'
+                  ? 'bg-blue-600 text-white shadow'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span>📊 Bảng Danh Sách Đối Đầu</span>
+            </button>
+            <button
+              onClick={() => setViewMode('cards')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all ${
+                viewMode === 'cards'
+                  ? 'bg-blue-600 text-white shadow'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span>🗂️ Thẻ So Sánh (Card View)</span>
+            </button>
+          </div>
+        </div>
+        <p className="text-xs text-slate-400">
+          {viewMode === 'table' ? 'Phân tích chi tiết từng ván cược, mã ván, sảnh, đài và chênh lệch cược' : 'Xem dạng thẻ so sánh trực quan từng cặp'}
+        </p>
+      </div>
+
+      {viewMode === 'table' ? (
+        <HeadToHeadTable alerts={safeAlerts} scanName={safeScan.name} />
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <div className="xl:col-span-2 space-y-6">
+            <div className="card">
+              <AlertFilterTabs 
+                activeTab={activeTab} 
+                onTabChange={setActiveTab} 
+                counts={counts} 
+              />
+              
+              <div className="space-y-6">
+                {filteredAlerts.length > 0 ? (
+                  filteredAlerts.map((alert, idx) => (
+                    <EvidencePair key={alert?.id || idx} alert={alert} />
+                  ))
+                ) : (
+                  <div className="py-16 text-center text-slate-400">
+                    <p className="text-base font-medium text-slate-300 mb-1">
+                      {activeTab === 'all' ? 'Chưa phát hiện hành vi gian lận nào trong phiên này' : 'Không có cảnh báo nào trong mức độ này'}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Hệ thống đã rà soát toàn bộ các ván cược đối đầu và chỉ số bất thường.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="xl:col-span-1">
+            <div className="sticky top-24">
+              <FraudTimeline alerts={safeAlerts} />
             </div>
           </div>
         </div>
-        
-        <div className="xl:col-span-1">
-          <div className="sticky top-24">
-            <FraudTimeline alerts={safeAlerts} />
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
