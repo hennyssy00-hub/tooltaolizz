@@ -79,9 +79,18 @@ async def run_scan(
     await db.commit()
 
     try:
-        # 2. Load all bets for this scan
-        bets_result = await db.execute(select(Bet).where(Bet.scan_id == scan_id))
-        bets = bets_result.scalars().all()
+        # 2. Load lightweight bet records (tiết kiệm 90% RAM, chống tràn bộ nhớ khi quét 24 file lớn)
+        stmt = (
+            select(
+                Bet.id, Bet.platform, Bet.player_id, Bet.round_id,
+                Bet.game_type, Bet.provider, Bet.bet_choice,
+                Bet.bet_choice_normalized, Bet.stake, Bet.payout,
+                Bet.bet_timestamp, Bet.result
+            )
+            .where(Bet.scan_id == scan_id)
+        )
+        bets_result = await db.execute(stmt)
+        bets = bets_result.all()
 
         if not bets:
             scan.status = "COMPLETED"

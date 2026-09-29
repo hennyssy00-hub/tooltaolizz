@@ -187,12 +187,20 @@ class ArbitrageDetector:
         platforms = sorted(platform_data.keys())
         all_candidates: list[ArbitragePair] = []
 
+        # Tiền chỉ mục toàn cục: platform -> {round_id: list[RoundBets]}
+        # Chỉ lập chỉ mục 1 lần duy nhất, giúp quét 24 đài (276 cặp liên đài) với độ trễ tối thiểu
+        platform_round_idx: dict[str, dict[str, list[RoundBets]]] = defaultdict(lambda: defaultdict(list))
+        for plat, rbs in platform_data.items():
+            for rb in rbs:
+                if rb.bet_area is not None:
+                    platform_round_idx[plat][rb.round_id].append(rb)
+
         # --- 内对打: Quét trong từng đài ---
         for platform in platforms:
-            rounds = platform_data[platform]
+            idx = platform_round_idx[platform]
             pairs = self._scan_pairs(
-                rounds_a=rounds,
-                rounds_b=rounds,
+                idx_a=idx,
+                idx_b=idx,
                 platform_a=platform,
                 platform_b=platform,
                 match_type="内对打",
@@ -203,10 +211,12 @@ class ArbitrageDetector:
 
         # --- 外对打: Quét giữa tất cả các đài ---
         for i, plat_a in enumerate(platforms):
+            idx_a = platform_round_idx[plat_a]
             for plat_b in platforms[i + 1:]:
+                idx_b = platform_round_idx[plat_b]
                 pairs = self._scan_pairs(
-                    rounds_a=platform_data[plat_a],
-                    rounds_b=platform_data[plat_b],
+                    idx_a=idx_a,
+                    idx_b=idx_b,
                     platform_a=plat_a,
                     platform_b=plat_b,
                     match_type="外对打",
@@ -414,29 +424,19 @@ class ArbitrageDetector:
 
     def _scan_pairs(
         self,
-        rounds_a: list[RoundBets],
-        rounds_b: list[RoundBets],
+        idx_a: dict[str, list[RoundBets]],
+        idx_b: dict[str, list[RoundBets]],
         platform_a: str,
         platform_b: str,
         match_type: Literal["内对打", "外对打"],
         min_rounds: int,
         is_internal: bool,
     ) -> list[ArbitragePair]:
-        """Quét tất cả cặp tài khoản giữa rounds_a và rounds_b."""
-
-        # Index: round_id → list of RoundBets
-        idx_a: dict[str, list[RoundBets]] = defaultdict(list)
-        for rb in rounds_a:
-            if rb.bet_area is not None:  # Chỉ xét cửa đã nhận diện
-                idx_a[rb.round_id].append(rb)
-
-        idx_b: dict[str, list[RoundBets]] = defaultdict(list)
-        for rb in rounds_b:
-            if rb.bet_area is not None:
-                idx_b[rb.round_id].append(rb)
-
+        """Quét tất cả cặp tài khoản giữa idx_a và idx_b."""
         # Tìm round_ids chung
         common_rounds = set(idx_a.keys()) & set(idx_b.keys())
+        if not common_rounds:
+            return []
 
         # Thu thập matched rounds cho từng cặp account
         pair_matches: dict[
