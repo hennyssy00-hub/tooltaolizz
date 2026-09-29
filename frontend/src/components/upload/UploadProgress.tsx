@@ -6,42 +6,31 @@ import { useRouter } from 'next/navigation';
 
 interface UploadProgressProps {
   scanId: string;
+  isComplete?: boolean;
+  currentStep?: number;
+  statusMessage?: string;
   error?: string | null;
   onRetry?: () => void;
   onBack?: () => void;
 }
 
-export function UploadProgress({ scanId, error, onRetry, onBack }: UploadProgressProps) {
+export function UploadProgress({ scanId, isComplete, currentStep = 0, statusMessage, error, onRetry, onBack }: UploadProgressProps) {
   const router = useRouter();
-  const [step, setStep] = useState(0);
 
   useEffect(() => {
-    if (error) return;
-    const timer1 = setTimeout(() => setStep(1), 1200);
-    const timer2 = setTimeout(() => setStep(2), 2400);
-    const timer3 = setTimeout(() => setStep(3), 3600);
-    return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      clearTimeout(timer3);
-    };
-  }, [error]);
-
-  useEffect(() => {
-    if (scanId && !error) {
-      setStep(4);
+    if (isComplete && scanId && !error) {
       const timer = setTimeout(() => {
         router.push(`/scans/${scanId}`);
-      }, 700);
+      }, 500);
       return () => clearTimeout(timer);
     }
-  }, [scanId, error, router]);
+  }, [isComplete, scanId, error, router]);
 
   const steps = [
-    { label: 'Đọc và phân tích file', desc: 'Kiểm tra định dạng và trích xuất dữ liệu...' },
-    { label: 'Chuẩn hóa dữ liệu', desc: 'Áp dụng mapping 6 cột vàng và làm sạch dữ liệu...' },
-    { label: 'Chạy thuật toán phát hiện', desc: 'Tìm kiếm mẫu cược chéo hai đầu, bao sân...' },
-    { label: 'Tạo báo cáo kết quả', desc: 'Tổng hợp cảnh báo và chuyển đến giao diện đối soát...' },
+    { label: 'Đọc và phân tích file', desc: 'Trích xuất dữ liệu, hỗ trợ đồng thời nhiều file/đài...' },
+    { label: 'Chuẩn hóa dữ liệu', desc: 'Áp dụng mapping 6 cột vàng và làm sạch dữ liệu cược...' },
+    { label: 'Chạy thuật toán đối đả 15 quy tắc', desc: 'Quét 内对打 (nội bộ) và 外对打 (liên đài), kiểm tra cùng tay...' },
+    { label: 'Tổng hợp báo cáo kết quả', desc: 'Khởi tạo chi tiết các cặp đối đầu và chuyển hướng...' },
   ];
 
   if (error) {
@@ -81,13 +70,19 @@ export function UploadProgress({ scanId, error, onRetry, onBack }: UploadProgres
           <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
         </div>
         <h2 className="text-xl font-bold text-slate-100">Đang xử lý dữ liệu...</h2>
-        <p className="text-slate-400 mt-2">Vui lòng không đóng trình duyệt trong quá trình này.</p>
+        {statusMessage ? (
+          <p className="text-blue-400 font-mono text-xs mt-2 bg-blue-950/40 border border-blue-800/50 py-1.5 px-3 rounded-lg max-w-md mx-auto truncate">
+            ⚡ {statusMessage}
+          </p>
+        ) : (
+          <p className="text-slate-400 mt-2 text-sm">Vui lòng không đóng trình duyệt trong quá trình này.</p>
+        )}
       </div>
 
       <div className="space-y-6 max-w-md mx-auto">
         {steps.map((s, idx) => {
-          const isCompleted = step > idx;
-          const isCurrent = step === idx;
+          const isCompleted = currentStep > idx || isComplete;
+          const isCurrent = currentStep === idx && !isComplete;
           
           return (
             <div key={idx} className={`flex items-start gap-4 ${isCompleted ? 'opacity-100' : isCurrent ? 'opacity-100' : 'opacity-40'}`}>
@@ -101,7 +96,7 @@ export function UploadProgress({ scanId, error, onRetry, onBack }: UploadProgres
                 )}
               </div>
               <div>
-                <h4 className={`font-medium ${isCurrent ? 'text-blue-400' : 'text-slate-200'}`}>{s.label}</h4>
+                <h4 className={`font-medium ${isCurrent ? 'text-blue-400' : isCompleted ? 'text-safe' : 'text-slate-200'}`}>{s.label}</h4>
                 <p className="text-sm text-slate-500">{s.desc}</p>
               </div>
             </div>

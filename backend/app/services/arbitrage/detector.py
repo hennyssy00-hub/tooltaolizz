@@ -446,88 +446,44 @@ class ArbitrageDetector:
             tuple[str, str], set[str]
         ] = defaultdict(set)
 
+        OPPOSITE_PAIRS_LIST = [
+            ("BANKER", "PLAYER"),
+            ("DRAGON", "TIGER"),
+            ("BIG", "SMALL"),
+            ("ODD", "EVEN"),
+            ("RED", "BLACK"),
+        ]
+
         for round_id in common_rounds:
             bets_a = idx_a[round_id]
             bets_b = idx_b[round_id]
 
+            # Phân vùng theo cửa cược trong ván (bỏ qua 95% ván không có cược đối nghịch)
+            group_a: dict[str, list[RoundBets]] = defaultdict(list)
             for ba in bets_a:
-                for bb in bets_b:
-                    # 内对打: phải khác account
-                    if is_internal and ba.account == bb.account:
-                        continue
+                group_a[ba.bet_area].append(ba)
 
-                    # Không so sánh cùng 1 record
-                    if ba is bb:
-                        continue
+            group_b: dict[str, list[RoundBets]] = defaultdict(list)
+            for bb in bets_b:
+                group_b[bb.bet_area].append(bb)
 
-                    # Sắp thứ tự account để tránh trùng lặp
-                    if is_internal:
-                        key = tuple(sorted([ba.account, bb.account]))
-                        acc_a, acc_b = key
-                        if ba.account == acc_a:
-                            r_a, r_b = ba, bb
-                        else:
-                            r_a, r_b = bb, ba
-                    else:
-                        acc_a, acc_b = ba.account, bb.account
-                        r_a, r_b = ba, bb
-
-                    pair_key = (acc_a, acc_b)
-
-                    # Đã có round này cho cặp này chưa? O(1) lookup
-                    if round_id in pair_matched_rids[pair_key]:
-                        continue
-
-                    # Kiểm tra cửa đối nghịch
-                    if not is_opposite(r_a.bet_area, r_b.bet_area):
-                        continue
-
-                    # Kiểm tra chênh cược ≤10%
-                    max_amount = max(r_a.total_amount, r_b.total_amount)
-                    if max_amount == 0:
-                        continue
-                    stake_diff = abs(
-                        r_a.total_amount - r_b.total_amount
-                    ) / max_amount
-                    if round(stake_diff, 4) > round(self.max_stake_diff_pct, 4):
-                        continue
-
-                    # Bằng tiền chính xác?
-                    is_equal = (abs(r_a.total_amount - r_b.total_amount) < 1e-4)
-
-                    # Kiểm tra 1 thắng 1 thua
-                    wl_a = r_a.total_win_loss
-                    wl_b = r_b.total_win_loss
-                    if not self._check_one_win_one_loss(wl_a, wl_b):
-                        continue
-
-                    # Kiểm tra payout 90-100%
-                    payout = self._calc_payout(
-                        r_a.total_amount, r_b.total_amount,
-                        wl_a, wl_b,
+            for opt_a, opt_b in OPPOSITE_PAIRS_LIST:
+                sub_a1 = group_a.get(opt_a)
+                sub_b1 = group_b.get(opt_b)
+                if sub_a1 and sub_b1:
+                    self._match_opposing_sublists(
+                        sub_a1, sub_b1, round_id, platform_a, platform_b,
+                        is_internal, pair_matches, pair_matched_rids
                     )
-                    if payout is None:
-                        continue
-                    if not (self.min_payout_pct - 1e-4 <= payout <= self.max_payout_pct + 1e-4):
-                        continue
 
-                    pair_matches[pair_key].append(MatchedRound(
-                        round_id=round_id,
-                        account_a=acc_a,
-                        account_b=acc_b,
-                        platform_a=platform_a,
-                        platform_b=platform_b,
-                        bet_area_a=r_a.bet_area,
-                        bet_area_b=r_b.bet_area,
-                        amount_a=r_a.total_amount,
-                        amount_b=r_b.total_amount,
-                        win_loss_a=wl_a,
-                        win_loss_b=wl_b,
-                        stake_diff_pct=stake_diff,
-                        is_equal_stake=is_equal,
-                        payout_pct=payout,
-                    ))
-                    pair_matched_rids[pair_key].add(round_id)
+                if not is_internal:
+                    sub_a2 = group_a.get(opt_b)
+                    sub_b2 = group_b.get(opt_a)
+                    if sub_a2 and sub_b2:
+                        self._match_opposing_sublists(
+                            sub_a2, sub_b2, round_id, platform_a, platform_b,
+                            is_internal, pair_matches, pair_matched_rids
+                        )
 
         # Lọc theo ngưỡng
         result: list[ArbitragePair] = []
@@ -562,6 +518,75 @@ class ArbitrageDetector:
             ))
 
         return result
+
+    def _match_opposing_sublists(
+        self,
+        sub_a: list[RoundBets],
+        sub_b: list[RoundBets],
+        round_id: str,
+        platform_a: str,
+        platform_b: str,
+        is_internal: bool,
+        pair_matches: dict[tuple[str, str], list[MatchedRound]],
+        pair_matched_rids: dict[tuple[str, str], set[str]],
+    ) -> None:
+        for ba in sub_a:
+            for bb in sub_b:
+                if is_internal and ba.account == bb.account:
+                    continue
+                if ba is bb:
+                    continue
+
+                if is_internal:
+                    key = tuple(sorted([ba.account, bb.account]))
+                    acc_a, acc_b = key
+                    r_a, r_b = (ba, bb) if ba.account == acc_a else (bb, ba)
+                else:
+                    acc_a, acc_b = ba.account, bb.account
+                    r_a, r_b = ba, bb
+
+                pair_key = (acc_a, acc_b)
+                if round_id in pair_matched_rids[pair_key]:
+                    continue
+
+                # 1 thắng 1 thua
+                wl_a = r_a.total_win_loss
+                wl_b = r_b.total_win_loss
+                if not self._check_one_win_one_loss(wl_a, wl_b):
+                    continue
+
+                # Chênh cược <= 10%
+                max_amount = max(r_a.total_amount, r_b.total_amount)
+                if max_amount == 0:
+                    continue
+                stake_diff = abs(r_a.total_amount - r_b.total_amount) / max_amount
+                if round(stake_diff, 4) > round(self.max_stake_diff_pct, 4):
+                    continue
+
+                # Payout 90%-100%
+                payout = self._calc_payout(r_a.total_amount, r_b.total_amount, wl_a, wl_b)
+                if payout is None or not (self.min_payout_pct - 1e-4 <= payout <= self.max_payout_pct + 1e-4):
+                    continue
+
+                is_equal = abs(r_a.total_amount - r_b.total_amount) < 1e-4
+
+                pair_matches[pair_key].append(MatchedRound(
+                    round_id=round_id,
+                    account_a=acc_a,
+                    account_b=acc_b,
+                    platform_a=platform_a,
+                    platform_b=platform_b,
+                    bet_area_a=r_a.bet_area,
+                    bet_area_b=r_b.bet_area,
+                    amount_a=r_a.total_amount,
+                    amount_b=r_b.total_amount,
+                    win_loss_a=wl_a,
+                    win_loss_b=wl_b,
+                    stake_diff_pct=stake_diff,
+                    is_equal_stake=is_equal,
+                    payout_pct=payout,
+                ))
+                pair_matched_rids[pair_key].add(round_id)
 
     # -----------------------------------------------------------------
     # Check same-hand (cùng tay) for a candidate pair

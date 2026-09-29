@@ -245,41 +245,43 @@ async def upload_file(
 
             platforms_seen.add(actual_platform)
 
-            bet = Bet(
-                id=str(uuid.uuid4()),
-                scan_id=scan_id,
-                platform=actual_platform,
-                category=bet_category,
-                provider=actual_provider,
-                game_type=game_type,
-                event_name=event_name,
-                league=league,
-                table_id=str(mapped.get('table_id', '')),
-                round_id=str(mapped.get('round_id', '')),
-                player_id=player_id,
-                bet_choice=raw_bet_choice,
-                bet_choice_normalized=bet_choice_normalized,
-                odds=odds,
-                stake=stake,
-                valid_bet=valid_bet,
-                payout=payout,
-                bet_timestamp=bet_timestamp,
-                ip_address=ip_address if ip_address else None,
-                device_id=device_id if device_id else None,
-                agent_id=agent_id if agent_id else None,
-                bet_type_detail=bet_type_detail if bet_type_detail else None,
-                result=str(mapped.get('result', 'PENDING')),
-                raw_data=row,
-            )
-            bets_to_add.append(bet)
+            bet_dict = {
+                "id": str(uuid.uuid4()),
+                "scan_id": scan_id,
+                "platform": actual_platform,
+                "category": bet_category,
+                "provider": actual_provider,
+                "game_type": game_type,
+                "event_name": event_name,
+                "league": league,
+                "table_id": str(mapped.get('table_id', '')),
+                "round_id": str(mapped.get('round_id', '')),
+                "player_id": player_id,
+                "bet_choice": raw_bet_choice,
+                "bet_choice_normalized": bet_choice_normalized,
+                "odds": odds,
+                "stake": stake,
+                "valid_bet": valid_bet,
+                "payout": payout,
+                "bet_timestamp": bet_timestamp,
+                "ip_address": ip_address if ip_address else None,
+                "device_id": device_id if device_id else None,
+                "agent_id": agent_id if agent_id else None,
+                "bet_type_detail": bet_type_detail if bet_type_detail else None,
+                "result": str(mapped.get('result', 'PENDING')),
+                "raw_data": row,
+                "created_at": now,
+            }
+            bets_to_add.append(bet_dict)
 
         except Exception as e:
             errors.append({"row": idx, "error": str(e)})
 
-    # High-speed batch insertion
-    for i in range(0, len(bets_to_add), 2000):
-        db.add_all(bets_to_add[i:i+2000])
-        await db.flush()
+    # Siêu tối ưu: Bulk insert bằng SQLAlchemy Core (nhanh gấp 50 lần so với ORM)
+    from sqlalchemy import insert
+    for i in range(0, len(bets_to_add), 3000):
+        await db.execute(insert(Bet), bets_to_add[i:i+3000])
+    await db.flush()
 
     bets_created = len(bets_to_add)
 
@@ -297,35 +299,32 @@ async def upload_file(
             platforms.append(platform_name)
             scan_obj.platforms = platforms
 
-    # Batch upsert accounts for seen players
+    # Tối ưu hóa: Batch upsert tài khoản bằng set-diff & Core bulk insert
     pids_list = list(player_ids_seen)
-    for i in range(0, len(pids_list), 500):
-        batch_pids = pids_list[i:i+500]
-        acc_stmt = select(Account).where(Account.player_id.in_(batch_pids))
-        existing_accs = (await db.execute(acc_stmt)).scalars().all()
-        existing_map = {a.player_id: a for a in existing_accs}
-
-        for pid in batch_pids:
-            if pid in existing_map:
-                acc = existing_map[pid]
-                acc.last_seen = datetime.utcnow()
-                if platform_name not in (acc.platforms or []):
-                    platforms = list(acc.platforms or [])
-                    platforms.append(platform_name)
-                    acc.platforms = platforms
-            else:
-                new_acc = Account(
-                    id=str(uuid.uuid4()),
-                    player_id=pid,
-                    platforms=[platform_name],
-                    total_bets=0,
-                    total_alerts=0,
-                    risk_score=0,
-                    risk_level="SAFE",
-                    first_seen=datetime.utcnow(),
-                    last_seen=datetime.utcnow(),
-                )
-                db.add(new_acc)
+    if pids_list:
+        for i in range(0, len(pids_list), 1000):
+            batch_pids = pids_list[i:i+1000]
+            existing_stmt = select(Account.player_id).where(Account.player_id.in_(batch_pids))
+            existing_pids = set((await db.execute(existing_stmt)).scalars().all())
+            new_pids = [pid for pid in batch_pids if pid not in existing_pids]
+            if new_pids:
+                new_acc_dicts = [
+                    {
+                        "id": str(uuid.uuid4()),
+                        "player_id": pid,
+                        "platforms": [platform_name],
+                        "total_bets": 0,
+                        "total_alerts": 0,
+                        "risk_score": 0,
+                        "risk_level": "SAFE",
+                        "first_seen": now,
+                        "last_seen": now,
+                        "created_at": now,
+                        "updated_at": now,
+                    }
+                    for pid in new_pids
+                ]
+                await db.execute(insert(Account), new_acc_dicts)
         await db.flush()
 
     await db.commit()

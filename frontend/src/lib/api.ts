@@ -11,7 +11,7 @@ const BACKEND_BASE = typeof window !== 'undefined' ? '/api' : 'http://localhost:
 
 export const api = {
   // Upload & Scan
-  uploadFile: async (file: File, platformName: string, category: string = 'casino', columnMapping?: string) => {
+  uploadFile: async (file: File, platformName: string, category: string = 'casino', columnMapping?: string, scanId?: string) => {
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -19,6 +19,9 @@ export const api = {
       formData.append('category', category.toUpperCase());
       if (columnMapping) {
         formData.append('column_mapping', columnMapping);
+      }
+      if (scanId) {
+        formData.append('scan_id', scanId);
       }
       const res = await axios.post(`${BACKEND_BASE}/upload`, formData);
       return res.data;

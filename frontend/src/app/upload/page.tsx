@@ -22,6 +22,9 @@ export default function UploadPage() {
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [scanId, setScanId] = useState<string>('');
   const [scanError, setScanError] = useState<string | null>(null);
+  const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
+  const [statusMessage, setStatusMessage] = useState<string>('');
+  const [isScanComplete, setIsScanComplete] = useState<boolean>(false);
 
   const handleSelectCategory = (cat: 'casino' | 'sports') => {
     setSelectedCategory(cat);
@@ -30,7 +33,7 @@ export default function UploadPage() {
 
   const handleFilesAccepted = async (files: any[]) => {
     setUploadedFiles(files);
-    // Detect columns
+    // Detect columns from first file
     const cols = await api.detectColumns(files[0].file);
     setDetectedColumns(cols);
     setStep('mapping');
@@ -44,28 +47,62 @@ export default function UploadPage() {
   const handleStartScan = async (config: any) => {
     setStep('processing');
     setScanError(null);
+    setCurrentStepIndex(0);
+    setIsScanComplete(false);
     try {
-      const fileItem = uploadedFiles[0];
-      if (!fileItem?.file) {
+      if (!uploadedFiles || uploadedFiles.length === 0) {
         throw new Error('Chưa có file nào được chọn');
       }
-      const uploadRes = await api.uploadFile(
-        fileItem.file,
-        fileItem.platform || 'MULTI',
-        selectedCategory.toUpperCase(),
-        JSON.stringify(columnMapping)
-      );
 
-      if (uploadRes.error) {
-        throw new Error(uploadRes.message || 'Lỗi nhận diện file');
+      let currentScanId = '';
+      const totalFiles = uploadedFiles.length;
+
+      // 1. Tải lên và gom dữ liệu của TẤT CẢ các file vào chung 1 phiên quét
+      for (let i = 0; i < totalFiles; i++) {
+        const item = uploadedFiles[i];
+        if (!item?.file) continue;
+
+        setCurrentStepIndex(0);
+        setStatusMessage(`Đang đọc & trích xuất dữ liệu file ${i + 1}/${totalFiles}: ${item.file.name}...`);
+
+        const uploadRes = await api.uploadFile(
+          item.file,
+          item.platform || 'MULTI',
+          selectedCategory.toUpperCase(),
+          JSON.stringify(columnMapping),
+          currentScanId || undefined
+        );
+
+        if (uploadRes.error) {
+          throw new Error(uploadRes.message || `Lỗi nhận diện file ${item.file.name}`);
+        }
+
+        if (!currentScanId && uploadRes.scan_id) {
+          currentScanId = uploadRes.scan_id;
+          setScanId(currentScanId);
+        }
+
+        setCurrentStepIndex(1);
+        setStatusMessage(`Đã nạp ${uploadRes.bets_created || 0} vé cược từ ${item.file.name} (File ${i + 1}/${totalFiles})`);
       }
 
-      const newScanId = uploadRes.scan_id;
-      if (!newScanId) {
-        throw new Error('Máy chủ không thể tạo phiên quét từ file đã nạp');
+      if (!currentScanId) {
+        throw new Error('Máy chủ không thể tạo phiên quét từ các file đã nạp');
       }
-      setScanId(newScanId);
-      await api.runScan(newScanId, config?.profile_id || config?.profile || 'STANDARD');
+
+      // 2. Chạy thuật toán đối soát 15 quy tắc
+      setCurrentStepIndex(2);
+      setStatusMessage(`Đang chạy đối soát 15 quy tắc (chuẩn hóa tên đài, kiểm tra đối đầu & cược cùng tay)...`);
+
+      const scanResult = await api.runScan(currentScanId, config?.profile_id || config?.profile || 'STANDARD');
+
+      // 3. Tổng hợp báo cáo kết quả
+      setCurrentStepIndex(3);
+      const totalAlerts = scanResult?.total_alerts || 0;
+      setStatusMessage(`Đã quét xong: Phát hiện ${totalAlerts} ván đối đầu nghi vấn! Đang chuyển hướng...`);
+
+      // 4. Đánh dấu hoàn tất để chuyển trang
+      setIsScanComplete(true);
     } catch (err: any) {
       console.error('Scan execution error:', err);
       const errMsg = 
@@ -183,6 +220,9 @@ export default function UploadPage() {
       {step === 'processing' && (
         <UploadProgress 
           scanId={scanId} 
+          isComplete={isScanComplete}
+          currentStep={currentStepIndex}
+          statusMessage={statusMessage}
           error={scanError} 
           onRetry={() => setStep('config')} 
           onBack={() => setStep('upload')} 

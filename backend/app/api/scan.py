@@ -95,30 +95,33 @@ async def run_scan(
             detection_engine.run, scan_id, bets, category=scan_cat, profile_id=profile_id
         )
 
-        # 4. Save alerts to database
+        # 4. Save alerts to database (Bulk insert)
+        from sqlalchemy import insert
         alert_counts = {
             "CROSS_HEDGE": 0, "TABLE_COVERAGE": 0, "SYNDICATE": 0, "ANOMALY": 0,
             "SPORTS_ARBITRAGE": 0, "SPORTS_HEDGE": 0
         }
         severity_counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
         alerts_created = 0
+        alert_dicts = []
+        now = datetime.utcnow()
 
         for raw_alert in raw_alerts:
-            alert = Alert(
-                id=str(uuid.uuid4()),
-                scan_id=scan_id,
-                alert_type=raw_alert.get("alert_type", "UNKNOWN"),
-                severity=raw_alert.get("severity", "MEDIUM"),
-                risk_score=raw_alert.get("risk_score", 50),
-                bet_a_id=raw_alert.get("bet_a_id"),
-                bet_b_id=raw_alert.get("bet_b_id"),
-                time_diff_seconds=raw_alert.get("time_diff_seconds"),
-                stake_diff_pct=raw_alert.get("stake_diff_pct"),
-                description=raw_alert.get("description", ""),
-                evidence=raw_alert.get("evidence", {}),
-                status="PENDING",
-            )
-            db.add(alert)
+            alert_dicts.append({
+                "id": str(uuid.uuid4()),
+                "scan_id": scan_id,
+                "alert_type": raw_alert.get("alert_type", "UNKNOWN"),
+                "severity": raw_alert.get("severity", "MEDIUM"),
+                "risk_score": raw_alert.get("risk_score", 50),
+                "bet_a_id": raw_alert.get("bet_a_id"),
+                "bet_b_id": raw_alert.get("bet_b_id"),
+                "time_diff_seconds": raw_alert.get("time_diff_seconds"),
+                "stake_diff_pct": raw_alert.get("stake_diff_pct"),
+                "description": raw_alert.get("description", ""),
+                "evidence": raw_alert.get("evidence", {}),
+                "status": "PENDING",
+                "created_at": now,
+            })
             alerts_created += 1
 
             alert_type = raw_alert.get("alert_type", "UNKNOWN")
@@ -128,6 +131,11 @@ async def run_scan(
             severity = raw_alert.get("severity", "MEDIUM")
             if severity in severity_counts:
                 severity_counts[severity] += 1
+
+        if alert_dicts:
+            for i in range(0, len(alert_dicts), 2000):
+                await db.execute(insert(Alert), alert_dicts[i:i+2000])
+            await db.flush()
 
         # 5. Update account risk scores based on alerts
         # Fast map: bet_id -> player_id for O(1) player lookup
