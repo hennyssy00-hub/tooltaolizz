@@ -8,7 +8,11 @@ class SyndicateDetector:
         # Build round to players mapping
         round_players = defaultdict(list)
         for b in bets:
-            round_players[(b.provider, b.game_type, b.round_id)].append(b)
+            rid = str(getattr(b, "round_id", "") or "").strip()
+            # CRITICAL: Bets with empty or invalid round_id must never be grouped as the same round
+            if not rid or rid.upper() in ("N/A", "NONE", "NAN", "NULL", "0", "UNKNOWN", ""):
+                continue
+            round_players[(b.provider, b.game_type, rid)].append(b)
             
         co_occurrence = defaultdict(int)
         opposite_occurrence = defaultdict(int)
@@ -19,8 +23,17 @@ class SyndicateDetector:
                 for j in range(i+1, len(group_bets)):
                     a = group_bets[i]
                     b = group_bets[j]
-                    if a.player_id != b.player_id:
-                        pair_key = tuple(sorted([a.player_id, b.player_id]))
+                    if str(a.player_id).strip() != str(b.player_id).strip():
+                        # Verify timestamps are within reasonable session window (<= 15 minutes)
+                        if getattr(a, 'bet_timestamp', None) and getattr(b, 'bet_timestamp', None):
+                            try:
+                                diff = abs((a.bet_timestamp - b.bet_timestamp).total_seconds())
+                                if diff > 900:  # Different sessions/games
+                                    continue
+                            except Exception:
+                                pass
+
+                        pair_key = tuple(sorted([str(a.player_id).strip(), str(b.player_id).strip()]))
                         co_occurrence[pair_key] += 1
                         bet_pairs[pair_key].append((a, b))
                         if is_opposite(a.game_type, a.bet_choice_normalized, b.bet_choice_normalized):
@@ -35,6 +48,13 @@ class SyndicateDetector:
 
                 first_pair = bet_pairs[pair][0]
                 a, b = first_pair[0], first_pair[1]
+
+                time_diff = 0.0
+                if getattr(a, 'bet_timestamp', None) and getattr(b, 'bet_timestamp', None):
+                    try:
+                        time_diff = round(abs((a.bet_timestamp - b.bet_timestamp).total_seconds()), 1)
+                    except Exception:
+                        time_diff = 0.0
 
                 desc = (
                     f"Phát hiện nhóm đánh vây / tài khoản cùng hội giữa {pair[0]} và {pair[1]}: "
@@ -84,6 +104,8 @@ class SyndicateDetector:
                         "round_id": str(a.round_id or b.round_id or ""),
                         "gameType": str(a.game_type or "Live Casino"),
                         "game": str(a.game_type or "Live Casino"),
+                        "timeDiffSeconds": time_diff,
+                        "sync_latency_sec": time_diff,
                     }
                 })
         return alerts

@@ -18,6 +18,7 @@ export function HeadToHeadTable({ alerts, scanName = 'Phiên đối soát' }: He
   const [gameFilter, setGameFilter] = useState('all');
   const [severityFilter, setSeverityFilter] = useState('all');
   const [equalStakeOnly, setEqualStakeOnly] = useState(false);
+  const [typeFilter, setTypeFilter] = useState<'all' | 'arbitrage' | 'syndicate'>('all');
   const [copiedRound, setCopiedRound] = useState<string | null>(null);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
@@ -31,9 +32,19 @@ export function HeadToHeadTable({ alerts, scanName = 'Phiên đối soát' }: He
       const betA: Bet | undefined = ev.betA;
       const betB: Bet | undefined = ev.betB;
 
-      const roundId = alert.roundId || ev.roundId || ev.round_id || betA?.roundId || betB?.roundId || 'N/A';
-      const gameType = alert.gameType || ev.gameType || ev.game || betA?.gameType || betB?.gameType || 'Live Casino';
-      const provider = (betA as any)?.provider || betA?.platform || ev.provider || 'Live Casino';
+      const rawAlert = alert as any;
+      const alertType: string = rawAlert.alertType || rawAlert.type || rawAlert.alert_type || (ev.match_type ? 'CROSS_HEDGE' : 'UNKNOWN');
+
+      const roundId = rawAlert.roundId || ev.roundId || ev.round_id || betA?.roundId || betB?.roundId || 'N/A';
+      
+      // Sanitize gameType: if numeric string (e.g. "-70.0" or "20.0"), replace with 'Baccarat'
+      let rawGame = rawAlert.gameType || ev.gameType || ev.game || betA?.gameType || betB?.gameType || 'Baccarat';
+      if (!isNaN(Number(rawGame)) && isFinite(Number(rawGame))) {
+        rawGame = 'Baccarat';
+      }
+      const gameType = rawGame;
+
+      const provider = (betA as any)?.provider || ev.provider || betA?.platform || 'Live Casino';
       const platformA = betA?.platform || ev.platform_a || 'Đài A';
       const platformB = betB?.platform || ev.platform_b || 'Đài B';
 
@@ -52,13 +63,28 @@ export function HeadToHeadTable({ alerts, scanName = 'Phiên đối soát' }: He
       const payoutA = betA?.payout ?? 0;
       const payoutB = betB?.payout ?? 0;
 
-      const timeDiff = ev.timeDiffSeconds ?? ev.sync_latency_sec ?? (alert as any).timeDiffSeconds ?? 0;
+      // Accurate time difference calculation
+      let timeDiff = ev.timeDiffSeconds ?? ev.sync_latency_sec ?? rawAlert.timeDiffSeconds ?? rawAlert.time_diff_seconds;
+      if ((timeDiff === undefined || timeDiff === null) && betA?.timestamp && betB?.timestamp) {
+        try {
+          const tA = new Date(betA.timestamp).getTime();
+          const tB = new Date(betB.timestamp).getTime();
+          if (!isNaN(tA) && !isNaN(tB)) {
+            timeDiff = Math.round(Math.abs(tA - tB) / 1000 * 10) / 10;
+          }
+        } catch (e) {
+          timeDiff = 0;
+        }
+      }
+      timeDiff = typeof timeDiff === 'number' ? timeDiff : 0;
+
       const severity = alert.severity || 'medium';
       const riskScore = alert.riskScore ?? 50;
       const description = alert.description || '';
 
       return {
         id: alert.id || `row-${idx}`,
+        alertType,
         roundId,
         gameType,
         provider,
@@ -81,10 +107,26 @@ export function HeadToHeadTable({ alerts, scanName = 'Phiên đối soát' }: He
         description,
         betA,
         betB,
+        coOccurrence: ev.co_occurrence || ev.coOccurrence || 0,
+        oppositeOccurrence: ev.opposite_occurrence || ev.oppositeOccurrence || 0,
         tags: Array.isArray(ev.tags) ? ev.tags : [],
       };
     });
   }, [alerts]);
+
+  // Counts for tabs
+  const typeCounts = useMemo(() => {
+    let arbitrage = 0;
+    let syndicate = 0;
+    rows.forEach(r => {
+      if (r.alertType === 'SYNDICATE' || r.roundId === 'N/A') {
+        syndicate++;
+      } else {
+        arbitrage++;
+      }
+    });
+    return { arbitrage, syndicate, all: rows.length };
+  }, [rows]);
 
   // Unique games for filter dropdown
   const gamesList = useMemo(() => {
@@ -96,6 +138,10 @@ export function HeadToHeadTable({ alerts, scanName = 'Phiên đối soát' }: He
   // Filtered rows
   const filteredRows = useMemo(() => {
     return rows.filter(r => {
+      // Type tab filter
+      if (typeFilter === 'arbitrage' && (r.alertType === 'SYNDICATE' || r.roundId === 'N/A')) return false;
+      if (typeFilter === 'syndicate' && !(r.alertType === 'SYNDICATE' || r.roundId === 'N/A')) return false;
+
       if (equalStakeOnly && !r.isEqualStake) return false;
       if (gameFilter !== 'all' && r.gameType !== gameFilter) return false;
       if (severityFilter !== 'all' && r.severity.toLowerCase() !== severityFilter.toLowerCase()) return false;
@@ -112,7 +158,7 @@ export function HeadToHeadTable({ alerts, scanName = 'Phiên đối soát' }: He
 
       return true;
     });
-  }, [rows, searchTerm, gameFilter, severityFilter, equalStakeOnly]);
+  }, [rows, typeFilter, searchTerm, gameFilter, severityFilter, equalStakeOnly]);
 
   // KPI Summary
   const kpi = useMemo(() => {
@@ -205,6 +251,42 @@ export function HeadToHeadTable({ alerts, scanName = 'Phiên đối soát' }: He
             <span className="text-[10px] text-slate-500">{kpi.equalRatio >= 90 ? 'Cực cao' : 'Bình thường'}</span>
           </div>
         </div>
+      </div>
+
+      {/* Sub-Tabs: Arbitrage vs Syndicate vs All */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-750 pb-3">
+        <button
+          onClick={() => setTypeFilter('arbitrage')}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            typeFilter === 'arbitrage'
+              ? 'bg-blue-600 text-white shadow'
+              : 'text-slate-400 hover:text-slate-200 bg-slate-800/60 border border-slate-700/60'
+          }`}
+        >
+          <Swords className="w-3.5 h-3.5" />
+          <span>⚔️ Ván Đối Đầu Trực Diện ({typeCounts.arbitrage})</span>
+        </button>
+        <button
+          onClick={() => setTypeFilter('syndicate')}
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            typeFilter === 'syndicate'
+              ? 'bg-purple-600 text-white shadow'
+              : 'text-slate-400 hover:text-slate-200 bg-slate-800/60 border border-slate-700/60'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>👥 Nhóm Đánh Vây / Cùng Hội ({typeCounts.syndicate})</span>
+        </button>
+        <button
+          onClick={() => setTypeFilter('all')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${
+            typeFilter === 'all'
+              ? 'bg-slate-700 text-white shadow'
+              : 'text-slate-400 hover:text-slate-200 bg-slate-800/60 border border-slate-700/60'
+          }`}
+        >
+          <span>Tất Cả ({typeCounts.all})</span>
+        </button>
       </div>
 
       {/* Filter and Search Bar */}
@@ -314,21 +396,27 @@ export function HeadToHeadTable({ alerts, scanName = 'Phiên đối soát' }: He
 
                         {/* Mã Ván (Round ID) */}
                         <td className="py-3.5 px-3">
-                          <div className="flex items-center gap-1.5 group">
-                            <span className="font-mono text-blue-300 font-semibold truncate max-w-[140px]" title={r.roundId}>
-                              {r.roundId}
+                          {r.alertType === 'SYNDICATE' && r.roundId === 'N/A' ? (
+                            <span className="inline-flex items-center gap-1 font-semibold text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20 text-[11px]">
+                              👥 Nhóm {r.coOccurrence > 0 ? `${r.coOccurrence} ván` : 'Liên kết'}
                             </span>
-                            {r.roundId !== 'N/A' && (
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); copyToClipboard(r.roundId); }}
-                                className="text-slate-500 hover:text-slate-200 transition-colors p-0.5"
-                                title="Sao chép mã ván"
-                              >
-                                {copiedRound === r.roundId ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                              </button>
-                            )}
-                          </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5 group">
+                              <span className="font-mono text-blue-300 font-semibold truncate max-w-[140px]" title={r.roundId}>
+                                {r.roundId}
+                              </span>
+                              {r.roundId !== 'N/A' && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); copyToClipboard(r.roundId); }}
+                                  className="text-slate-500 hover:text-slate-200 transition-colors p-0.5"
+                                  title="Sao chép mã ván"
+                                >
+                                  {copiedRound === r.roundId ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </td>
 
                         {/* Đài & Sảnh */}
@@ -365,15 +453,21 @@ export function HeadToHeadTable({ alerts, scanName = 'Phiên đối soát' }: He
 
                         {/* Cửa cược A ↔ B */}
                         <td className="py-3.5 px-3 text-center">
-                          <div className="flex items-center justify-center gap-1.5 font-bold">
-                            <span className="px-2 py-0.5 rounded bg-red-950/60 text-red-300 border border-red-700/50">
-                              {r.betChoiceA}
+                          {r.alertType === 'SYNDICATE' && (r.betChoiceA === 'N/A' || r.betChoiceA === 'UNKNOWN') ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-750">
+                              Chung phòng/bàn
                             </span>
-                            <span className="text-slate-500 text-[10px]">vs</span>
-                            <span className="px-2 py-0.5 rounded bg-blue-950/60 text-blue-300 border border-blue-700/50">
-                              {r.betChoiceB}
-                            </span>
-                          </div>
+                          ) : (
+                            <div className="flex items-center justify-center gap-1.5 font-bold">
+                              <span className="px-2 py-0.5 rounded bg-red-950/60 text-red-300 border border-red-700/50">
+                                {r.betChoiceA}
+                              </span>
+                              <span className="text-slate-500 text-[10px]">vs</span>
+                              <span className="px-2 py-0.5 rounded bg-blue-950/60 text-blue-300 border border-blue-700/50">
+                                {r.betChoiceB}
+                              </span>
+                            </div>
+                          )}
                         </td>
 
                         {/* Tiền Cược A ↔ B */}
@@ -400,15 +494,19 @@ export function HeadToHeadTable({ alerts, scanName = 'Phiên đối soát' }: He
 
                         {/* Lệch Giây */}
                         <td className="py-3.5 px-3 text-center">
-                          <span className={`font-mono text-[11px] px-2 py-0.5 rounded font-bold ${
-                            r.timeDiff <= 1.5 
-                              ? 'bg-red-500/20 text-red-400 border border-red-500/40' 
-                              : r.timeDiff <= 5 
-                                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
-                                : 'text-slate-400'
-                          }`}>
-                            {r.timeDiff.toFixed(1)}s
-                          </span>
+                          {r.alertType === 'SYNDICATE' && r.roundId === 'N/A' ? (
+                            <span className="text-slate-500 text-xs">-</span>
+                          ) : (
+                            <span className={`font-mono text-[11px] px-2 py-0.5 rounded font-bold ${
+                              r.timeDiff <= 1.5 
+                                ? 'bg-red-500/20 text-red-400 border border-red-500/40' 
+                                : r.timeDiff <= 5 
+                                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
+                                  : 'text-slate-400'
+                            }`}>
+                              {r.timeDiff.toFixed(1)}s
+                            </span>
+                          )}
                         </td>
 
                         {/* Đánh Giá / Severity */}
@@ -420,7 +518,7 @@ export function HeadToHeadTable({ alerts, scanName = 'Phiên đối soát' }: He
                                 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' 
                                 : 'bg-slate-700/50 text-slate-300 border border-slate-600'
                           }`}>
-                            {r.severity} ({r.riskScore})
+                            {r.alertType === 'SYNDICATE' ? 'HỘI NHÓM' : r.severity} ({r.riskScore})
                           </span>
                         </td>
 

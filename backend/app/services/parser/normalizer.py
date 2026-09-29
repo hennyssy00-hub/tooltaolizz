@@ -47,8 +47,9 @@ BET_CHOICE_MAP = {
     'Red': 'RED', 'R': 'RED', 'red': 'RED',
     'Black': 'BLACK', 'BLK': 'BLACK', 'black': 'BLACK',
     # Vietnamese
-    'Cái': 'BANKER', 'cái': 'BANKER', 'Con': 'PLAYER', 'con': 'PLAYER',
-    'Hòa': 'TIE', 'hòa': 'TIE',
+    'Cái': 'BANKER', 'cái': 'BANKER', 'Nhà cái': 'BANKER', 'nhà cái': 'BANKER', 'nha cai': 'BANKER',
+    'Con': 'PLAYER', 'con': 'PLAYER', 'Người chơi': 'PLAYER', 'người chơi': 'PLAYER', 'nguoi choi': 'PLAYER',
+    'Hòa': 'TIE', 'hòa': 'TIE', 'hoa': 'TIE',
     'Tài': 'BIG', 'tài': 'BIG', 'Xỉu': 'SMALL', 'xỉu': 'SMALL',
     'Lẻ': 'ODD', 'lẻ': 'ODD', 'Chẵn': 'EVEN', 'chẵn': 'EVEN',
     'Rồng': 'DRAGON', 'rồng': 'DRAGON', 'Hổ': 'TIGER', 'hổ': 'TIGER',
@@ -69,17 +70,60 @@ BET_CHOICE_MAP = {
 def normalize_game_type(raw_type: str) -> str:
     """Normalize game type string to standard enum value."""
     if not raw_type:
-        return 'UNKNOWN'
-    stripped = raw_type.strip()
-    return GAME_TYPE_MAP.get(stripped, stripped.upper().replace(' ', '_'))
+        return 'Live Casino'
+    stripped = str(raw_type).strip()
+    # Guard against numeric values falsely placed in game_type (e.g. payout numbers '-70.0')
+    try:
+        float(stripped)
+        return 'Live Casino'
+    except ValueError:
+        pass
+
+    if stripped in GAME_TYPE_MAP:
+        return GAME_TYPE_MAP[stripped]
+
+    low = stripped.lower()
+    for k, v in GAME_TYPE_MAP.items():
+        if k.lower() == low:
+            return v
+    if 'baccarat' in low or 'bac bo' in low:
+        return 'BACCARAT'
+    if 'sicbo' in low or 'tài xỉu' in low:
+        return 'SICBO'
+    if 'roulette' in low or 'luân bàn' in low:
+        return 'ROULETTE'
+    if 'dragon' in low or 'tiger' in low or 'rồng hổ' in low:
+        return 'DRAGON_TIGER'
+
+    return stripped
 
 
 def normalize_bet_choice(raw_choice: str) -> str:
     """Normalize bet choice string to standard enum value."""
     if not raw_choice:
         return 'UNKNOWN'
-    stripped = raw_choice.strip()
-    return BET_CHOICE_MAP.get(stripped, stripped.upper())
+    stripped = str(raw_choice).strip()
+    if stripped in BET_CHOICE_MAP:
+        return BET_CHOICE_MAP[stripped]
+
+    low = stripped.lower()
+    for k, v in BET_CHOICE_MAP.items():
+        if k.lower() == low:
+            return v
+
+    # Check composite prefixes/suffixes (e.g. BacBo_Player, Baccarat_Banker)
+    if 'player' in low or 'người chơi' in low or 'nguoi choi' in low or low.endswith('_p'):
+        return 'PLAYER'
+    if 'banker' in low or 'nhà cái' in low or 'nha cai' in low or low.endswith('_b'):
+        return 'BANKER'
+    if 'tie' in low or 'hòa' in low or 'hoa' in low or low.endswith('_t'):
+        return 'TIE'
+    if 'big' in low or 'tài' in low:
+        return 'BIG'
+    if 'small' in low or 'xỉu' in low:
+        return 'SMALL'
+
+    return stripped.upper()
 
 
 def detect_category(game_type_normalized: str) -> str:

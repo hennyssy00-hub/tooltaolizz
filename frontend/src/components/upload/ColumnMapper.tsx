@@ -95,7 +95,71 @@ function autoDetect(col: string, category: 'casino' | 'sports'): string {
     return 'ipAddress';
   }
 
-  // 2. Player ID / Account (Tài khoản / 用户名 / 账号)
+  // 2. Payout / Win Loss (MUST BE CHECKED FIRST to prevent 'Trò chơi Thắng/thua' matching gameType)
+  if (
+    lower === '游戏输赢' || lower === '输赢' || lower === '输赢金额' || lower === '派彩' || 
+    lower === '盈亏' || lower.includes('thắng/thua') || lower.includes('thắng thua') || 
+    lower.includes('payout') || lower.includes('win_loss') || lower.includes('win/loss') || 
+    lower.includes('winloss') || lower.includes('profit') || lower.includes('tiền thắng thua')
+  ) {
+    return 'payout';
+  }
+
+  // 3. Timestamp / Bet Time (MUST BE CHECKED BEFORE STAKE so 'thời gian cược' is not treated as stake)
+  if (
+    lower === '投注时间' || lower === '下注时间' || lower.includes('thời gian cược') ||
+    lower.includes('thời gian đặt') || lower.includes('thời gian tạo') || lower.includes('thời gian') || 
+    lower.includes('bet time') || lower.includes('timestamp') || lower.includes('ngày') || 
+    lower.includes('date') || lower.includes('time')
+  ) {
+    return 'timestamp';
+  }
+
+  // 4. Bet Choice / Area (Cửa cược / 投注区域 / Khu cá cược)
+  if (
+    lower.includes('khu cá cược') || lower.includes('khu cược') || lower.includes('khu vực cược') ||
+    lower.includes('投注区域') || lower.includes('下注区域') || lower.includes('投注内容') || 
+    lower.includes('下注内容') || lower.includes('投注类型') || lower.includes('cửa cược') || 
+    lower.includes('cửa đặt') || lower.includes('choice') || lower.includes('selection') || 
+    lower.includes('bet on') || lower.includes('bet_choice') || lower === 'cửa'
+  ) {
+    return 'betChoice';
+  }
+
+  // 5. Stake / Bet Amount (Tiền cược / 投注额 / 投注金额) - Exclude time & valid bet
+  if (
+    !lower.includes('thời gian') && !lower.includes('hợp lệ') && (
+      lower === '投注额' || lower === '下注额' || lower === '投注金额' || lower === '下注金额' ||
+      lower.includes('số tiền cược') || lower.includes('tiền cược') || lower.includes('tiền đặt') || 
+      lower.includes('số tiền') || lower.includes('stake') || lower.includes('bet amount') || 
+      lower.includes('bet_amount') || lower === 'amount'
+    )
+  ) {
+    return 'stake';
+  }
+
+  // 6. Round ID (Mã ván / 局号 / 三方游戏局号 / Mã số trò chơi ba chiều)
+  if (
+    lower.includes('mã số trò chơi ba chiều') || lower.includes('trò chơi ba chiều') ||
+    lower.includes('mã trò chơi ba chiều') || lower.includes('三方游戏局号') || 
+    lower.includes('游戏局号') || lower.includes('局号') || lower.includes('三方局号') || 
+    lower.includes('round') || lower.includes('phiên') || lower.includes('ván') || 
+    lower.includes('mã ván') || lower.includes('txid') || lower.includes('bill no') || 
+    lower.includes('wager id') || lower.includes('注单号') || lower.includes('số giao dịch')
+  ) {
+    return 'roundId';
+  }
+
+  // 7. Provider / Platform (Sảnh / 厂商 / 平台 / Nhà chế tạo)
+  if (
+    lower === '厂商' || lower === '游戏厂商' || lower.includes('nhà chế tạo') ||
+    lower.includes('nhà cung cấp') || lower.includes('hãng game') || lower.includes('sảnh') || 
+    lower.includes('provider') || lower.includes('platform') || lower === '平台'
+  ) {
+    return 'provider';
+  }
+
+  // 8. Player ID / Account (Tài khoản / 用户名 / 账号)
   if (
     lower === '用户名' || lower === '账号' || lower === '帐号' || lower === '会员账号' ||
     lower.includes('会员') || lower.includes('user') || lower.includes('player') || 
@@ -105,75 +169,24 @@ function autoDetect(col: string, category: 'casino' | 'sports'): string {
     return 'playerId';
   }
 
-  // 3. Round ID (Mã ván / 局号 / 三方游戏局号)
+  // 9. Valid Bet (Cược hợp lệ / 有效投注)
   if (
-    lower.includes('三方游戏局号') || lower.includes('游戏局号') || lower.includes('局号') || 
-    lower.includes('三方局号') || lower.includes('round') || lower.includes('phiên') || 
-    lower.includes('ván') || lower.includes('mã ván') || lower.includes('txid') || 
-    lower.includes('bill no') || lower.includes('wager id') || lower.includes('注单号')
-  ) {
-    return 'roundId';
-  }
-
-  // 4. Bet Choice / Area (Cửa cược / 投注区域 / 下注区域)
-  if (
-    lower.includes('投注区域') || lower.includes('下注区域') || lower.includes('投注内容') || 
-    lower.includes('下注内容') || lower.includes('投注类型') || lower.includes('cửa') || 
-    lower.includes('cửa cược') || lower.includes('choice') || lower.includes('selection') || 
-    lower.includes('bet on') || lower.includes('bet_choice')
-  ) {
-    return 'betChoice';
-  }
-
-  // 5. Stake / Bet Amount (Tiền cược / 投注额 / 投注金额)
-  if (
-    lower === '投注额' || lower === '下注额' || lower === '投注金额' || lower === '下注金额' ||
-    lower.includes('tiền cược') || lower.includes('số tiền') || lower.includes('stake') || 
-    lower.includes('bet amount') || lower.includes('bet_amount') || lower === 'amount'
-  ) {
-    return 'stake';
-  }
-
-  // 6. Timestamp / Bet Time (Thời gian / 投注时间 / 下注时间)
-  if (
-    lower === '投注时间' || lower === '下注时间' || lower.includes('thời gian') || 
-    lower.includes('bet time') || lower.includes('timestamp') || lower.includes('ngày') || 
-    lower.includes('date') || lower.includes('time')
-  ) {
-    return 'timestamp';
-  }
-
-  // 7. Provider / Platform (Sảnh / 厂商 / 平台)
-  if (
-    lower === '厂商' || lower === '游戏厂商' || lower.includes('sảnh') || 
-    lower.includes('provider') || lower.includes('platform') || lower === '平台'
-  ) {
-    return 'provider';
-  }
-
-  // 8. Game Type (Loại game / 游戏 / 游戏种类)
-  if (
-    lower === '游戏' || lower === '游戏种类' || lower === '游戏类型' || 
-    lower.includes('loại game') || lower.includes('trò chơi') || lower.includes('game type')
-  ) {
-    return 'gameType';
-  }
-
-  // 9. Payout / Win Loss (Thắng thua / 游戏输赢 / 派彩)
-  if (
-    lower === '游戏输赢' || lower === '输赢' || lower === '输赢金额' || lower === '派彩' || 
-    lower === '盈亏' || lower.includes('thắng') || lower.includes('payout') || 
-    lower.includes('win_loss') || lower.includes('winloss') || lower.includes('profit')
-  ) {
-    return 'payout';
-  }
-
-  // 10. Valid Bet (Cược hợp lệ / 有效投注)
-  if (
-    lower === '有效投注' || lower === '有效下注' || lower.includes('hợp lệ') || 
-    lower.includes('valid bet') || lower.includes('turnover')
+    lower === '有效投注' || lower === '有效下注' || lower.includes('cược hợp lệ') || 
+    lower.includes('hợp lệ') || lower.includes('valid bet') || lower.includes('turnover')
   ) {
     return 'validBet';
+  }
+
+  // 10. Game Type (Loại game / 游戏 / 游戏种类 / Loại trò chơi) - Exclude win/loss
+  if (
+    !lower.includes('thắng') && !lower.includes('thua') && !lower.includes('win') && !lower.includes('loss') &&
+    (
+      lower === '游戏' || lower === '游戏种类' || lower === '游戏类型' || 
+      lower.includes('loại trò chơi') || lower.includes('loại game') || 
+      lower.includes('tên trò chơi') || lower.includes('trò chơi') || lower.includes('game type')
+    )
+  ) {
+    return 'gameType';
   }
 
   // 11. Table ID (Mã bàn / 桌号)

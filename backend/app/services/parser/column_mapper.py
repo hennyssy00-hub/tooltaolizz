@@ -11,51 +11,51 @@ class ColumnMapper:
     # Standard field -> list of known keywords (lowercase)
     KEYWORDS: dict[str, list[str]] = {
         'round_id': [
-            '三方游戏局号', '游戏局号', '局号', '三方局号', 'round', 'ván', 'phiên', 'mã ván', 'game no', '游戏编号',
-            'round id', 'round no', 'round_id', 'roundid', 'game_no',
-            'bill no', 'bet id', 'wager id', '注单号',
+            'mã số trò chơi ba chiều', 'trò chơi ba chiều', 'mã trò chơi ba chiều', 'mã số trò chơi 3 chiều',
+            'mã số trò chơi', '三方游戏局号', '游戏局号', '局号', '三方局号', 'round', 'ván', 'phiên',
+            'mã ván', 'game no', 'round id', 'round no', 'round_id', 'roundid', 'game_no',
+            'bill no', 'wager id', '注单号', 'mã phiên cược', 'mã giao dịch', 'số giao dịch',
         ],
         'player_id': [
-            '用户名', '账号', '帐号', 'user', 'player', 'username', 'tên', 'member', '会员',
-            'account', 'tài khoản', 'player_id', 'userid', 'user_id',
-            'login', 'memberid', 'member_id', '会员账号', '会员名称',
+            'tên tài khoản', 'tài khoản', 'tên người chơi', 'tên đăng nhập', '用户名', '账号', '帐号',
+            'user', 'player', 'username', 'tên', 'member', '会员', 'account', 'player_id',
+            'userid', 'user_id', 'login', 'memberid', 'member_id', '会员账号', '会员名称',
         ],
         'game_type': [
-            'game', 'trò', 'loại game', 'game type', '游戏类型', '游戏种类', 'product',
-            'game_type', 'gametype', 'category', 'game name', 'gamename',
+            'loại trò chơi', 'loại game', 'tên trò chơi', 'trò chơi', 'game', 'trò', 'game type',
+            '游戏类型', '游戏种类', 'product', 'game_type', 'gametype', 'category', 'game name', 'gamename',
         ],
         'bet_choice': [
+            'khu cá cược', 'khu cược', 'khu vực cược', 'cửa cược', 'cửa đặt', 'nội dung cược',
             '投注区域', '下注区域', '投注内容', '下注内容', '投注类型', '下注类型',
             'bet', 'cửa', 'choice', 'selection', '下注', 'bet on', 'bet type',
             'bet_choice', 'betchoice', 'bet_type', 'wager', 'bet content',
         ],
         'stake': [
-            '投注额', '下注额', '投注金额', '下注金额',
-            'stake', 'tiền', 'amount', 'bet amount', 'số tiền',
-            'cược', 'bet_amount', 'betamount', 'wager amount', 'valid bet',
-            'valid_bet', 'turnover',
+            'số tiền cược', 'tiền cược', 'tiền đặt', 'tiền đánh', '投注额', '下注额', '投注金额', '下注金额',
+            'stake', 'bet amount', 'số tiền', 'bet_amount', 'betamount', 'wager amount',
         ],
         'payout': [
-            '游戏输赢', '输赢', '输赢金额', '盈亏', '派彩',
-            'payout', 'win', 'thắng', 'winloss', 'win/loss',
-            'profit', 'win_loss', 'win amount', 'winamount', 'net',
+            'trò chơi thắng/thua', 'trò chơi thắng thua', 'thắng/thua', 'thắng thua', 'tiền thắng thua',
+            '游戏输赢', '输赢', '输赢金额', '盈亏', '派彩', 'payout', 'win', 'thắng', 'winloss', 'win/loss',
+            'profit', 'win_loss', 'win amount', 'winamount', 'net', 'thanh toán', 'kết toán',
         ],
         'bet_timestamp': [
-            '投注时间', '下注时间', 'time', 'date', 'thời gian', 'ngày', 'bet time',
-            'timestamp', 'bet_time', 'bettime', 'created', 'bet date',
-            'transaction time', 'settle time',
+            'thời gian cược', 'thời gian đặt cược', 'thời gian đặt', 'thời gian tạo', '投注时间', '下注时间',
+            'time', 'date', 'thời gian', 'ngày', 'bet time', 'timestamp', 'bet_time', 'bettime',
+            'created', 'bet date', 'transaction time', 'thời gian kết toán',
         ],
         'result': [
-            'result', 'kết quả', 'status', 'outcome', '结果',
+            'trạng thái', 'kết quả', 'status', 'outcome', '结果', 'result',
             'win_status', 'settle', 'settlement',
         ],
         'table_id': [
-            'table', 'bàn', 'desk', '桌号', 'table name', 'table id',
+            'mã bàn', 'bàn', 'desk', '桌号', 'table name', 'table id',
             'table_id', 'tableid', 'table_name', 'tablename', 'room',
         ],
         'provider': [
-            '厂商', '游戏厂商', 'provider', 'sảnh', 'platform', 'vendor', '平台',
-            'game provider', 'supplier', 'lobby', 'bookmaker', 'nhà cái',
+            'nhà chế tạo', 'nhà cung cấp', 'hãng game', 'sảnh game', 'sảnh cược', '厂商', '游戏厂商',
+            'provider', 'sảnh', 'platform', 'vendor', '平台', 'game provider', 'supplier', 'lobby',
         ],
         'odds': [
             'odds', 'odd', 'tỷ lệ', 'tỷ lệ kèo', 'kèo', 'rate', 'price', 'tỉ lệ', 'odds_rate',
@@ -89,33 +89,110 @@ class ColumnMapper:
             'market', 'market_type', 'thị trường', 'cược đơn', 'single_bet', '盘口', '玩法',
         ],
         'valid_bet': [
-            'valid_bet', 'cược hợp lệ', 'cược hiệu lực', 'tiền cược hợp lệ', 'validbet',
+            'cược hợp lệ', 'cược hiệu lực', 'tiền cược hợp lệ', 'valid_bet', 'validbet',
             'valid_amount', 'turnover', 'doanh thu', 'effective_bet', '有效投注', '有效下注',
         ],
     }
 
     def detect_mapping(self, columns: list[str]) -> dict[str, str]:
         """
-        Auto-detect column mappings from raw column names.
-
-        Returns dict mapping standard_field -> original_column_name.
+        Auto-detect column mappings with semantic prioritization.
+        Guarantees that compound phrases (e.g. 'thời gian cược', 'trò chơi thắng/thua')
+        are disambiguated accurately without false substring collisions.
         """
         mapping: dict[str, str] = {}
         used_columns: set[str] = set()
 
+        # Step 1: Semantic priority matching for tricky multi-meaning columns
         for col in columns:
+            low = col.lower().strip()
+
+            # Payout must be checked before game_type to prevent 'Trò chơi Thắng/thua' -> game_type
+            if any(w in low for w in ['thắng/thua', 'thắng thua', 'thắng_thua', '输赢', '盈亏', '派彩', 'win/loss', 'win_loss', 'winloss', 'payout', 'profit']):
+                if 'payout' not in mapping and col not in used_columns:
+                    mapping['payout'] = col
+                    used_columns.add(col)
+                    continue
+
+            # Timestamp must be checked before stake so 'thời gian cược' is never mapped to stake
+            if any(w in low for w in ['thời gian cược', 'thời gian đặt', '投注时间', '下注时间', 'timestamp', 'bet time', 'bet_time', 'bettime']):
+                if 'bet_timestamp' not in mapping and col not in used_columns:
+                    mapping['bet_timestamp'] = col
+                    used_columns.add(col)
+                    continue
+
+            # Bet Choice / Area
+            if any(w in low for w in ['khu cá cược', 'khu cược', 'khu vực cược', 'cửa cược', 'cửa đặt', '投注区域', '下注区域', '投注内容', '下注内容', 'bet choice', 'bet_choice', 'bet area']):
+                if 'bet_choice' not in mapping and col not in used_columns:
+                    mapping['bet_choice'] = col
+                    used_columns.add(col)
+                    continue
+
+            # Stake
+            if any(w in low for w in ['số tiền cược', 'tiền cược', 'tiền đặt', 'tiền đánh', '投注金额', '下注金额', '投注额', '下注额', 'stake', 'bet amount', 'bet_amount']) and 'thời gian' not in low and 'hợp lệ' not in low:
+                if 'stake' not in mapping and col not in used_columns:
+                    mapping['stake'] = col
+                    used_columns.add(col)
+                    continue
+
+            # Round ID (3D Game round, Ba chiều, 局号)
+            if any(w in low for w in ['mã số trò chơi ba chiều', 'trò chơi ba chiều', '三方游戏局号', '游戏局号', '局号', 'mã ván', 'phiên cược', 'round id', 'round_id', 'roundid', 'round no']):
+                if 'round_id' not in mapping and col not in used_columns:
+                    mapping['round_id'] = col
+                    used_columns.add(col)
+                    continue
+
+            # Provider
+            if any(w in low for w in ['nhà chế tạo', 'nhà cung cấp', 'sảnh game', 'sảnh cược', '厂商', '游戏厂商', 'provider', 'vendor', 'platform']):
+                if 'provider' not in mapping and col not in used_columns:
+                    mapping['provider'] = col
+                    used_columns.add(col)
+                    continue
+
+            # Player ID
+            if any(w in low for w in ['tên tài khoản', 'tài khoản', 'tên người chơi', 'tên đăng nhập', '用户名', '账号', '帐号', '会员账号', 'player_id', 'username', 'user_id']):
+                if 'player_id' not in mapping and col not in used_columns:
+                    mapping['player_id'] = col
+                    used_columns.add(col)
+                    continue
+
+            # Valid Bet
+            if any(w in low for w in ['cược hợp lệ', 'tiền cược hợp lệ', '有效投注', '有效下注', 'valid bet', 'valid_bet']):
+                if 'valid_bet' not in mapping and col not in used_columns:
+                    mapping['valid_bet'] = col
+                    used_columns.add(col)
+                    continue
+
+            # Game Type (Clean category like 'loại trò chơi', 'loại game')
+            if any(w in low for w in ['loại trò chơi', 'loại game', '游戏种类', '游戏类型']) and not any(w in low for w in ['thắng', 'thua', 'win', 'loss']):
+                if 'game_type' not in mapping and col not in used_columns:
+                    mapping['game_type'] = col
+                    used_columns.add(col)
+                    continue
+
+        # Step 2: Pass through standard keyword dictionaries for remaining fields
+        for col in columns:
+            if col in used_columns:
+                continue
             col_lower = col.lower().strip()
+
             for std_field, keywords in self.KEYWORDS.items():
                 if std_field in mapping:
                     continue
-                if col in used_columns:
+
+                # Disambiguation guards
+                if std_field == 'game_type' and any(w in col_lower for w in ['thắng', 'thua', 'win', 'loss', 'payout', 'ba chiều']):
                     continue
+                if std_field == 'stake' and any(w in col_lower for w in ['thời gian', 'ngày', 'time', 'date', 'khu', 'cửa']):
+                    continue
+
                 # Exact match first
                 if col_lower in keywords:
                     mapping[std_field] = col
                     used_columns.add(col)
                     break
-                # Partial match (keyword contained in column name)
+
+                # Prefix / Substring match
                 if any(kw in col_lower for kw in keywords):
                     mapping[std_field] = col
                     used_columns.add(col)
