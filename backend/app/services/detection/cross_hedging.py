@@ -62,7 +62,13 @@ class CrossHedgingDetector:
                         # Net Exposure Index: 0.0 = 100% neutralized, 1.0 = completely naked
                         net_exposure = abs(stake_a - stake_b) / total_stake if total_stake > 0 else 1.0
 
-                        time_diff = abs((a.bet_timestamp - b.bet_timestamp).total_seconds())
+                        if getattr(a, 'bet_timestamp', None) and getattr(b, 'bet_timestamp', None):
+                            try:
+                                time_diff = abs((a.bet_timestamp - b.bet_timestamp).total_seconds())
+                            except Exception:
+                                time_diff = 0.0
+                        else:
+                            time_diff = 0.0
 
                         # Filter by strictness profile time window
                         if time_diff > max_time_diff * 2:
