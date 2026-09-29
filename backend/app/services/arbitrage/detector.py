@@ -215,14 +215,21 @@ class ArbitrageDetector:
                 )
                 all_candidates.extend(pairs)
 
+        # Index: (platform, account) -> {round_id: RoundBets} for ultra-fast O(1) same-hand checks
+        account_rounds: dict[tuple[str, str], dict[str, RoundBets]] = defaultdict(dict)
+        for plat, rbs in platform_data.items():
+            for rb in rbs:
+                if rb.bet_area is not None:
+                    account_rounds[(plat, rb.account)][rb.round_id] = rb
+
         # --- Kiểm tra cùng tay & phân loại ---
-        valid_pairs: list[ArbitragePair] = []
+        candidate_valid_pairs: list[ArbitragePair] = []
         eliminated_pairs: list[EliminatedPair] = []
 
         for pair in all_candidates:
             # Kiểm tra cùng tay
             same_hand = self._check_same_hand(
-                pair, platform_data
+                pair, account_rounds
             )
             pair.same_hand_rounds = same_hand
 
@@ -262,10 +269,11 @@ class ArbitrageDetector:
                     remark="对打3-5局且同手1局，整组淘汰",
                 ))
             else:
-                valid_pairs.append(pair)
+                candidate_valid_pairs.append(pair)
 
-        # --- Kiểm tra cuối bắt buộc theo Mục 14 ---
-        self._validate_final_result(valid_pairs)
+        # --- Kiểm tra cuối bắt buộc theo Mục 14 (lọc an toàn, không crash 500) ---
+        valid_pairs, extra_elim = self._validate_final_result(candidate_valid_pairs)
+        eliminated_pairs.extend(extra_elim)
 
         # Stats
         stats = {
@@ -289,8 +297,8 @@ class ArbitrageDetector:
 
     def _validate_final_result(
         self,
-        valid_pairs: list[ArbitragePair],
-    ) -> None:
+        candidate_pairs: list[ArbitragePair],
+    ) -> tuple[list[ArbitragePair], list[EliminatedPair]]:
         """Kiểm tra cuối bắt buộc theo Mục 14 của tài liệu:
         - 内对打 không có Ván <3.
         - 外对打 không có Ván <4.
@@ -300,52 +308,105 @@ class ArbitrageDetector:
         - Không có cặp 同手Ván ≥2 trong file kết quả chính.
         - Mỗi cặp + mỗi 三方游戏局号 chỉ tính 1 lần.
         - Chênh cược từng ván ≤10%.
+
+        Các cặp không đạt bất kỳ tiêu chí nào sẽ được chuyển sang eliminated_pairs kèm lý do,
+        tuyệt đối không để xảy ra crash hệ thống.
         """
-        for p in valid_pairs:
+        valid_pairs: list[ArbitragePair] = []
+        extra_eliminated: list[EliminatedPair] = []
+
+        for p in candidate_pairs:
             # Ngưỡng ván
             if p.match_type == "内对打" and p.num_rounds < self.internal_min_rounds:
-                raise ValueError(
-                    f"Vi phạm kiểm tra cuối: Cặp {p.account_a}-{p.account_b} là 内对打 nhưng ván ({p.num_rounds}) < {self.internal_min_rounds}"
-                )
+                extra_eliminated.append(EliminatedPair(
+                    match_type=p.match_type, platform_a=p.platform_a, platform_b=p.platform_b,
+                    account_a=p.account_a, account_b=p.account_b, num_arb_rounds=p.num_rounds,
+                    num_equal_stake=p.num_equal_stake, total_stake=p.total_stake, total_diff=p.total_diff,
+                    num_same_hand=p.num_same_hand, remark=f"内对打 ván ({p.num_rounds}) < {self.internal_min_rounds}"
+                ))
+                continue
+
             if p.match_type == "外对打" and p.num_rounds < self.external_min_rounds:
-                raise ValueError(
-                    f"Vi phạm kiểm tra cuối: Cặp {p.account_a}-{p.account_b} là 外对打 nhưng ván ({p.num_rounds}) < {self.external_min_rounds}"
-                )
+                extra_eliminated.append(EliminatedPair(
+                    match_type=p.match_type, platform_a=p.platform_a, platform_b=p.platform_b,
+                    account_a=p.account_a, account_b=p.account_b, num_arb_rounds=p.num_rounds,
+                    num_equal_stake=p.num_equal_stake, total_stake=p.total_stake, total_diff=p.total_diff,
+                    num_same_hand=p.num_same_hand, remark=f"外对打 ván ({p.num_rounds}) < {self.external_min_rounds}"
+                ))
+                continue
+
             # Tỷ lệ bằng tiền
             if round(p.equal_stake_ratio, 4) < round(self.min_equal_stake_ratio, 4):
-                raise ValueError(
-                    f"Vi phạm kiểm tra cuối: Cặp {p.account_a}-{p.account_b} có tỷ lệ bằng tiền {p.equal_stake_ratio:.1%} < {self.min_equal_stake_ratio:.0%}"
-                )
+                extra_eliminated.append(EliminatedPair(
+                    match_type=p.match_type, platform_a=p.platform_a, platform_b=p.platform_b,
+                    account_a=p.account_a, account_b=p.account_b, num_arb_rounds=p.num_rounds,
+                    num_equal_stake=p.num_equal_stake, total_stake=p.total_stake, total_diff=p.total_diff,
+                    num_same_hand=p.num_same_hand, remark=f"Tỷ lệ bằng tiền {p.equal_stake_ratio:.1%} < {self.min_equal_stake_ratio:.0%}"
+                ))
+                continue
+
             # Cùng tay
             if p.num_same_hand >= 2:
-                raise ValueError(
-                    f"Vi phạm kiểm tra cuối: Cặp {p.account_a}-{p.account_b} có {p.num_same_hand} ván cùng tay nằm trong kết quả chính"
-                )
+                extra_eliminated.append(EliminatedPair(
+                    match_type=p.match_type, platform_a=p.platform_a, platform_b=p.platform_b,
+                    account_a=p.account_a, account_b=p.account_b, num_arb_rounds=p.num_rounds,
+                    num_equal_stake=p.num_equal_stake, total_stake=p.total_stake, total_diff=p.total_diff,
+                    num_same_hand=p.num_same_hand, remark="同手≥2局，整组淘汰"
+                ))
+                continue
+
             if p.num_same_hand == 1 and p.num_rounds < 6:
-                raise ValueError(
-                    f"Vi phạm kiểm tra cuối: Cặp {p.account_a}-{p.account_b} có {p.num_rounds} ván đối đả (<6) và 1 ván cùng tay không được nằm trong kết quả chính"
-                )
+                extra_eliminated.append(EliminatedPair(
+                    match_type=p.match_type, platform_a=p.platform_a, platform_b=p.platform_b,
+                    account_a=p.account_a, account_b=p.account_b, num_arb_rounds=p.num_rounds,
+                    num_equal_stake=p.num_equal_stake, total_stake=p.total_stake, total_diff=p.total_diff,
+                    num_same_hand=p.num_same_hand, remark="对打3-5局且同手1局，整组淘汰"
+                ))
+                continue
+
             # Từng ván đối đả
             seen_rids: set[str] = set()
+            clean_rounds: list[MatchedRound] = []
+            has_invalid_round = False
+            invalid_reason = ""
+
             for r in p.matched_rounds:
                 if r.round_id in seen_rids:
-                    raise ValueError(
-                        f"Vi phạm kiểm tra cuối: Trùng lặp round {r.round_id} trong cặp {p.account_a}-{p.account_b}"
-                    )
+                    has_invalid_round = True
+                    invalid_reason = f"Trùng lặp round {r.round_id}"
+                    break
                 seen_rids.add(r.round_id)
 
                 if not (self.min_payout_pct - 1e-4 <= r.payout_pct <= self.max_payout_pct + 1e-4):
-                    raise ValueError(
-                        f"Vi phạm kiểm tra cuối: Ván {r.round_id} có payout {r.payout_pct:.1%} ngoài phạm vi 90%-100%"
-                    )
+                    has_invalid_round = True
+                    invalid_reason = f"Ván {r.round_id} payout {r.payout_pct:.1%} ngoài phạm vi 90%-100%"
+                    break
+
                 if not ((r.win_loss_a > 0 and r.win_loss_b < 0) or (r.win_loss_a < 0 and r.win_loss_b > 0)):
-                    raise ValueError(
-                        f"Vi phạm kiểm tra cuối: Ván {r.round_id} không thỏa điều kiện 1 thắng 1 thua"
-                    )
+                    has_invalid_round = True
+                    invalid_reason = f"Ván {r.round_id} không thỏa điều kiện 1 thắng 1 thua"
+                    break
+
                 if round(r.stake_diff_pct, 4) > round(self.max_stake_diff_pct, 4):
-                    raise ValueError(
-                        f"Vi phạm kiểm tra cuối: Ván {r.round_id} có chênh cược {r.stake_diff_pct:.1%} > {self.max_stake_diff_pct:.0%}"
-                    )
+                    has_invalid_round = True
+                    invalid_reason = f"Ván {r.round_id} có chênh cược {r.stake_diff_pct:.1%} > {self.max_stake_diff_pct:.0%}"
+                    break
+
+                clean_rounds.append(r)
+
+            if has_invalid_round:
+                extra_eliminated.append(EliminatedPair(
+                    match_type=p.match_type, platform_a=p.platform_a, platform_b=p.platform_b,
+                    account_a=p.account_a, account_b=p.account_b, num_arb_rounds=p.num_rounds,
+                    num_equal_stake=p.num_equal_stake, total_stake=p.total_stake, total_diff=p.total_diff,
+                    num_same_hand=p.num_same_hand, remark=invalid_reason
+                ))
+                continue
+
+            p.matched_rounds = clean_rounds
+            valid_pairs.append(p)
+
+        return valid_pairs, extra_eliminated
 
     # -----------------------------------------------------------------
     # Internal: Scan pairs between two sets of round data
@@ -381,6 +442,9 @@ class ArbitrageDetector:
         pair_matches: dict[
             tuple[str, str], list[MatchedRound]
         ] = defaultdict(list)
+        pair_matched_rids: dict[
+            tuple[str, str], set[str]
+        ] = defaultdict(set)
 
         for round_id in common_rounds:
             bets_a = idx_a[round_id]
@@ -410,12 +474,8 @@ class ArbitrageDetector:
 
                     pair_key = (acc_a, acc_b)
 
-                    # Đã có round này cho cặp này chưa?
-                    # (mỗi cặp + mỗi round chỉ tính 1 lần)
-                    existing_rounds = {
-                        m.round_id for m in pair_matches[pair_key]
-                    }
-                    if round_id in existing_rounds:
+                    # Đã có round này cho cặp này chưa? O(1) lookup
+                    if round_id in pair_matched_rids[pair_key]:
                         continue
 
                     # Kiểm tra cửa đối nghịch
@@ -467,6 +527,7 @@ class ArbitrageDetector:
                         is_equal_stake=is_equal,
                         payout_pct=payout,
                     ))
+                    pair_matched_rids[pair_key].add(round_id)
 
         # Lọc theo ngưỡng
         result: list[ArbitragePair] = []
@@ -509,33 +570,16 @@ class ArbitrageDetector:
     def _check_same_hand(
         self,
         pair: ArbitragePair,
-        platform_data: dict[str, list[RoundBets]],
+        account_rounds: dict[tuple[str, str], dict[str, RoundBets]],
     ) -> list[SameHandRound]:
-        """Quay lại file gốc, tìm tất cả round mà 2 tài khoản cùng xuất hiện
-        và cược cùng cửa (同手)."""
+        """Tìm tất cả round mà 2 tài khoản cùng xuất hiện và cược cùng cửa (同手) qua index O(1)."""
 
         acc_a = pair.account_a
         acc_b = pair.account_b
 
-        # Thu thập RoundBets cho account A và B
-        bets_a: dict[str, RoundBets] = {}
-        bets_b: dict[str, RoundBets] = {}
-
-        if pair.match_type == "内对打":
-            # Cùng đài
-            for rb in platform_data[pair.platform_a]:
-                if rb.account == acc_a and rb.bet_area is not None:
-                    bets_a[rb.round_id] = rb
-                elif rb.account == acc_b and rb.bet_area is not None:
-                    bets_b[rb.round_id] = rb
-        else:
-            # Khác đài
-            for rb in platform_data[pair.platform_a]:
-                if rb.account == acc_a and rb.bet_area is not None:
-                    bets_a[rb.round_id] = rb
-            for rb in platform_data[pair.platform_b]:
-                if rb.account == acc_b and rb.bet_area is not None:
-                    bets_b[rb.round_id] = rb
+        # Lấy trực tiếp từ account_rounds O(1)
+        bets_a = account_rounds.get((pair.platform_a, acc_a), {})
+        bets_b = account_rounds.get((pair.platform_b, acc_b), {})
 
         # Tìm rounds cùng xuất hiện
         common = set(bets_a.keys()) & set(bets_b.keys())

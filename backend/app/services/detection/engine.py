@@ -85,6 +85,9 @@ class DetectionEngine:
             key = (platform, account, round_id)
             if key not in bet_lookup:
                 bet_lookup[key] = b
+            acc_round_key = (account, round_id)
+            if acc_round_key not in bet_lookup:
+                bet_lookup[acc_round_key] = b
 
         if not records_by_platform:
             return []
@@ -109,8 +112,8 @@ class DetectionEngine:
         alerts = []
         for pair in result.valid_pairs:
             for m in pair.matched_rounds:
-                bet_a = bet_lookup.get((m.platform_a, m.account_a, m.round_id))
-                bet_b = bet_lookup.get((m.platform_b, m.account_b, m.round_id))
+                bet_a = bet_lookup.get((m.platform_a, m.account_a, m.round_id)) or bet_lookup.get((m.account_a, m.round_id))
+                bet_b = bet_lookup.get((m.platform_b, m.account_b, m.round_id)) or bet_lookup.get((m.account_b, m.round_id))
 
                 time_a = getattr(bet_a, "bet_timestamp", None) if bet_a else None
                 time_b = getattr(bet_b, "bet_timestamp", None) if bet_b else None

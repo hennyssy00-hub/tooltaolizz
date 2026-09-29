@@ -11,7 +11,7 @@ class Alert(Base):
     alert_type = Column(String)
     severity = Column(String)
     risk_score = Column(Integer)
-    bet_a_id = Column(String, ForeignKey("bets.id"))
+    bet_a_id = Column(String, ForeignKey("bets.id"), nullable=True)
     bet_b_id = Column(String, ForeignKey("bets.id"), nullable=True)
     time_diff_seconds = Column(Float, nullable=True)
     stake_diff_pct = Column(Float, nullable=True)

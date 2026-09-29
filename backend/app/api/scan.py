@@ -3,6 +3,7 @@ Scan API: Creates scan sessions, runs the fraud detection engine,
 saves alerts, and updates account risk scores.
 """
 import uuid
+import asyncio
 from datetime import datetime
 from typing import Optional
 
@@ -88,9 +89,11 @@ async def run_scan(
             await db.commit()
             return {"scan_id": scan_id, "status": "COMPLETED", "total_alerts": 0}
 
-        # 3. Run detection engine with selected profile
+        # 3. Run detection engine with selected profile (offloaded to thread to avoid blocking event loop)
         scan_cat = getattr(scan, 'category', 'ALL') or 'ALL'
-        raw_alerts = detection_engine.run(scan_id, bets, category=scan_cat, profile_id=profile_id)
+        raw_alerts = await asyncio.to_thread(
+            detection_engine.run, scan_id, bets, category=scan_cat, profile_id=profile_id
+        )
 
         # 4. Save alerts to database
         alert_counts = {
@@ -127,28 +130,18 @@ async def run_scan(
                 severity_counts[severity] += 1
 
         # 5. Update account risk scores based on alerts
-        # Collect player_ids from bets involved in alerts
+        # Fast map: bet_id -> player_id for O(1) player lookup
+        bet_player_map = {b.id: b.player_id for b in bets if b.id and b.player_id}
         player_alert_scores: dict[str, list[int]] = {}
         for raw_alert in raw_alerts:
-            bet_a_id = raw_alert.get("bet_a_id")
-            # Find which player owns this bet
-            for b in bets:
-                if b.id == bet_a_id:
-                    pid = b.player_id
-                    if pid not in player_alert_scores:
-                        player_alert_scores[pid] = []
-                    player_alert_scores[pid].append(raw_alert.get("risk_score", 50))
-                    break
+            r_score = raw_alert.get("risk_score", 50)
+            pid_a = bet_player_map.get(raw_alert.get("bet_a_id"))
+            if pid_a:
+                player_alert_scores.setdefault(pid_a, []).append(r_score)
 
-            bet_b_id = raw_alert.get("bet_b_id")
-            if bet_b_id:
-                for b in bets:
-                    if b.id == bet_b_id:
-                        pid = b.player_id
-                        if pid not in player_alert_scores:
-                            player_alert_scores[pid] = []
-                        player_alert_scores[pid].append(raw_alert.get("risk_score", 50))
-                        break
+            pid_b = bet_player_map.get(raw_alert.get("bet_b_id"))
+            if pid_b:
+                player_alert_scores.setdefault(pid_b, []).append(r_score)
 
         # Update each account's risk score in batch
         flagged_pids = list(player_alert_scores.keys())
@@ -202,10 +195,15 @@ async def run_scan(
         }
 
     except Exception as e:
-        scan.status = "FAILED"
-        scan.summary = {"error": str(e)}
-        await db.commit()
-        raise HTTPException(500, f"Scan failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        try:
+            scan.status = "FAILED"
+            scan.summary = {"error": str(e)}
+            await db.commit()
+        except Exception:
+            pass
+        raise HTTPException(500, detail=f"Lỗi hệ thống khi quét: {str(e)}")
 
 
 @router.get("")

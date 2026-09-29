@@ -68,7 +68,12 @@ export default function UploadPage() {
       await api.runScan(newScanId, config?.profile_id || config?.profile || 'STANDARD');
     } catch (err: any) {
       console.error('Scan execution error:', err);
-      const errMsg = err?.response?.data?.detail || err?.message || 'Có lỗi khi quét dữ liệu';
+      const errMsg = 
+        err?.response?.data?.detail || 
+        err?.response?.data?.message || 
+        (typeof err?.response?.data === 'string' ? err?.response?.data : null) ||
+        err?.message || 
+        'Có lỗi khi quét dữ liệu';
       setScanError(errMsg);
     }
   };

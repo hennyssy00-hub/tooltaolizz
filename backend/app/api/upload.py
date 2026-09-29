@@ -25,12 +25,17 @@ column_mapper = ColumnMapper()
 
 def _read_file(content: bytes, filename: str, nrows: Optional[int] = None) -> pd.DataFrame:
     """Read uploaded file into a pandas DataFrame, with optional nrows for fast preview."""
-    if filename.endswith('.csv'):
-        return pd.read_csv(io.BytesIO(content), nrows=nrows)
-    elif filename.endswith(('.xlsx', '.xls')):
-        return pd.read_excel(io.BytesIO(content), nrows=nrows)
-    else:
-        raise HTTPException(400, f"Unsupported file format: {filename}. Use .csv or .xlsx")
+    try:
+        if filename.endswith('.csv'):
+            return pd.read_csv(io.BytesIO(content), nrows=nrows)
+        elif filename.endswith(('.xlsx', '.xls')):
+            return pd.read_excel(io.BytesIO(content), nrows=nrows)
+        else:
+            raise HTTPException(400, f"Định dạng file không hỗ trợ: {filename}. Vui lòng dùng .csv hoặc .xlsx")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, f"Không thể đọc file {filename}: {str(e)}")
 
 
 @router.post("/detect-columns")
