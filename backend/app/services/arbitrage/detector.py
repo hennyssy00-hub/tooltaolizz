@@ -114,10 +114,10 @@ class ArbitragePair:
 
     @property
     def remark(self) -> str:
-        """Ghi chú (备注)."""
+        """Ghi chú (备注) theo Quy tắc 9 & 14."""
         sh = self.num_same_hand
-        if sh == 1:
-            return "同手1局（未达淘汰条件）"
+        if sh == 1 and self.num_rounds >= 6:
+            return "同手1局（对打≥6局，保留观察）"
         return ""
 
 
@@ -226,8 +226,14 @@ class ArbitrageDetector:
             )
             pair.same_hand_rounds = same_hand
 
-            if pair.num_same_hand >= 2:
-                # LOẠI do cùng tay ≥2
+            sh = pair.num_same_hand
+            # Quy tắc loại mới theo Mục 9:
+            # A. 同手Ván ≥2 -> LOẠI TOÀN BỘ CẶP
+            # B. 同手Ván = 1:
+            #    - Ván đối打 từ 3–5: chỉ cần 1 ván cùng tay cũng loại.
+            #    - Ván đối打 ≥6: có 1 ván cùng tay chưa đủ điều kiện loại; tiếp tục giữ nếu tất cả điều kiện khác đạt.
+            # C. 同手Ván = 0 -> Giữ
+            if sh >= 2:
                 eliminated_pairs.append(EliminatedPair(
                     match_type=pair.match_type,
                     platform_a=pair.platform_a,
@@ -238,7 +244,22 @@ class ArbitrageDetector:
                     num_equal_stake=pair.num_equal_stake,
                     total_stake=pair.total_stake,
                     total_diff=pair.total_diff,
-                    num_same_hand=pair.num_same_hand,
+                    num_same_hand=sh,
+                    remark="同手≥2局，整组淘汰",
+                ))
+            elif sh == 1 and pair.num_rounds < 6:
+                eliminated_pairs.append(EliminatedPair(
+                    match_type=pair.match_type,
+                    platform_a=pair.platform_a,
+                    platform_b=pair.platform_b,
+                    account_a=pair.account_a,
+                    account_b=pair.account_b,
+                    num_arb_rounds=pair.num_rounds,
+                    num_equal_stake=pair.num_equal_stake,
+                    total_stake=pair.total_stake,
+                    total_diff=pair.total_diff,
+                    num_same_hand=sh,
+                    remark="对打3-5局且同手1局，整组淘汰",
                 ))
             else:
                 valid_pairs.append(pair)
@@ -299,6 +320,10 @@ class ArbitrageDetector:
             if p.num_same_hand >= 2:
                 raise ValueError(
                     f"Vi phạm kiểm tra cuối: Cặp {p.account_a}-{p.account_b} có {p.num_same_hand} ván cùng tay nằm trong kết quả chính"
+                )
+            if p.num_same_hand == 1 and p.num_rounds < 6:
+                raise ValueError(
+                    f"Vi phạm kiểm tra cuối: Cặp {p.account_a}-{p.account_b} có {p.num_rounds} ván đối đả (<6) và 1 ván cùng tay không được nằm trong kết quả chính"
                 )
             # Từng ván đối đả
             seen_rids: set[str] = set()

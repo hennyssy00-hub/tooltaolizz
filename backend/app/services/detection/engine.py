@@ -24,61 +24,22 @@ class DetectionEngine:
         self.sports_arbitrage = SportsArbitrageDetector()
 
     def run(self, scan_id, bets, category="ALL", profile_id="STANDARD", custom_config=None):
+        """
+        Runs EXCLUSIVELY the 15-rule Arbitrage (对打) detection engine as the core and sole algorithm.
+        No other auxiliary algorithms are run, ensuring 100% adherence to the user's specification.
+        """
         profile = get_profile(profile_id)
         if custom_config:
-            # Merge custom config overrides
             profile = {**profile, **custom_config}
 
-        all_alerts = []
-        cat = category.upper() if category else "ALL"
+        # Cốt lõi duy nhất: Quét Đối Đả / Arbitrage theo đúng 15 quy tắc
+        all_alerts = self._run_arbitrage_detector(bets, profile)
 
-        # 1. Run Casino Detectors
-        if cat in ["CASINO", "ALL"]:
-            # Run the 15-rule Arbitrage / 对打 Detection Engine first
-            arb_alerts = self._run_arbitrage_detector(bets, profile)
-            all_alerts.extend(arb_alerts)
-
-            all_alerts.extend(
-                self.cross_hedging.detect(bets, config=profile.get("cross_hedge"))
-            )
-            all_alerts.extend(
-                self.table_coverage.detect(bets, config=profile.get("table_coverage"))
-            )
-
-        # 2. Run Sports Detectors
-        if cat in ["SPORTS", "ALL"]:
-            all_alerts.extend(
-                self.sports_arbitrage.detect(bets, config=profile.get("sports"))
-            )
-
-        # 3. Run Universal Multi-Account & Statistical Detectors
-        all_alerts.extend(
-            self.syndicate.detect(bets)
-        )
-        all_alerts.extend(
-            self.anomaly.detect(bets, config=profile.get("anomaly"))
-        )
-
-        # Deduplicate overlapping cross-hedge alerts on the same (round_id, pair of accounts)
-        seen_pairs = set()
-        deduped_alerts = []
         for a in all_alerts:
-            ev = a.get("evidence", {}) or {}
-            rid = ev.get("roundId") or a.get("round_id") or ""
-            pA = (ev.get("betA") or {}).get("playerId") or ""
-            pB = (ev.get("betB") or {}).get("playerId") or ""
-            if rid and pA and pB:
-                pair_key = (rid, tuple(sorted([str(pA), str(pB)])))
-                if pair_key in seen_pairs:
-                    continue
-                seen_pairs.add(pair_key)
-            deduped_alerts.append(a)
-
-        for a in deduped_alerts:
             a['scan_id'] = scan_id
             a['profile_used'] = profile_id
 
-        return deduped_alerts
+        return all_alerts
 
     def _run_arbitrage_detector(self, bets, profile) -> list[dict]:
         """
