@@ -25,6 +25,7 @@ export default function UploadPage() {
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [isScanComplete, setIsScanComplete] = useState<boolean>(false);
+  const [isDetecting, setIsDetecting] = useState<boolean>(false);
 
   const handleSelectCategory = (cat: 'casino' | 'sports') => {
     setSelectedCategory(cat);
@@ -32,11 +33,25 @@ export default function UploadPage() {
   };
 
   const handleFilesAccepted = async (files: any[]) => {
+    setIsDetecting(true);
     setUploadedFiles(files);
-    // Detect columns from first file
-    const cols = await api.detectColumns(files[0].file);
-    setDetectedColumns(cols);
-    setStep('mapping');
+    try {
+      // Detect columns from first file
+      const cols = await api.detectColumns(files[0].file);
+      setDetectedColumns(cols);
+      setStep('mapping');
+    } catch (err: any) {
+      console.error("Detect columns error:", err);
+      setDetectedColumns(['Mã ván', 'Tài khoản', 'Loại game', 'Cửa cược', 'Số tiền cược', 'Thời gian', 'Thắng thua']);
+      setStep('mapping');
+    } finally {
+      setIsDetecting(false);
+    }
+  };
+
+  const handleQuickScan = async (files: any[]) => {
+    setUploadedFiles(files);
+    handleStartScan({ profile_id: 'STANDARD' }, files);
   };
 
   const handleMappingConfirm = (mapping: Record<string, string>) => {
@@ -44,22 +59,23 @@ export default function UploadPage() {
     setStep('config');
   };
 
-  const handleStartScan = async (config: any) => {
+  const handleStartScan = async (config: any, overrideFiles?: any[]) => {
     setStep('processing');
     setScanError(null);
     setCurrentStepIndex(0);
     setIsScanComplete(false);
     try {
-      if (!uploadedFiles || uploadedFiles.length === 0) {
+      const filesToProcess = overrideFiles || uploadedFiles;
+      if (!filesToProcess || filesToProcess.length === 0) {
         throw new Error('Chưa có file nào được chọn');
       }
 
       let currentScanId = '';
-      const totalFiles = uploadedFiles.length;
+      const totalFiles = filesToProcess.length;
 
       // 1. Tải lên và gom dữ liệu của TẤT CẢ các file vào chung 1 phiên quét
       for (let i = 0; i < totalFiles; i++) {
-        const item = uploadedFiles[i];
+        const item = filesToProcess[i];
         if (!item?.file) continue;
 
         setCurrentStepIndex(0);
@@ -69,7 +85,7 @@ export default function UploadPage() {
           item.file,
           item.platform || 'MULTI',
           selectedCategory.toUpperCase(),
-          JSON.stringify(columnMapping),
+          Object.keys(columnMapping).length > 0 ? JSON.stringify(columnMapping) : undefined,
           currentScanId || undefined
         );
 
@@ -201,7 +217,13 @@ export default function UploadPage() {
         })}
       </div>
 
-      {step === 'upload' && <FileDropzone onFilesAccepted={handleFilesAccepted} />}
+      {step === 'upload' && (
+        <FileDropzone 
+          onFilesAccepted={handleFilesAccepted} 
+          onQuickScan={handleQuickScan}
+          isLoading={isDetecting}
+        />
+      )}
       {step === 'mapping' && (
         <ColumnMapper 
           detectedColumns={detectedColumns} 

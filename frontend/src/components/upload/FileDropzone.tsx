@@ -6,9 +6,11 @@ import { UploadCloud, File as FileIcon, X, Plus } from 'lucide-react';
 
 interface FileDropzoneProps {
   onFilesAccepted: (files: { file: File; platform: string }[]) => void;
+  onQuickScan?: (files: { file: File; platform: string }[]) => void;
+  isLoading?: boolean;
 }
 
-export function FileDropzone({ onFilesAccepted }: FileDropzoneProps) {
+export function FileDropzone({ onFilesAccepted, onQuickScan, isLoading = false }: FileDropzoneProps) {
   const [items, setItems] = useState<{ file: File; platform: string }[]>([]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -56,10 +58,16 @@ export function FileDropzone({ onFilesAccepted }: FileDropzoneProps) {
 
       {items.length > 0 && (
         <div className="space-y-3 mt-6">
-          <h4 className="font-medium text-slate-200">File đã chọn:</h4>
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium text-slate-200">File đã chọn ({items.length} file):</h4>
+            <span className="text-xs text-slate-400">
+              Tổng dung lượng: {(items.reduce((acc, cur) => acc + cur.file.size, 0) / 1024 / 1024).toFixed(2)} MB
+            </span>
+          </div>
+
           {items.map((item, index) => (
             <div key={index} className="flex items-center gap-4 bg-slate-800 p-3 rounded-lg border border-slate-700">
-              <FileIcon className="w-8 h-8 text-blue-500" />
+              <FileIcon className="w-8 h-8 text-blue-500 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-slate-200 truncate">{item.file.name}</p>
                 <p className="text-xs text-slate-500">{(item.file.size / 1024 / 1024).toFixed(2)} MB</p>
@@ -69,6 +77,7 @@ export function FileDropzone({ onFilesAccepted }: FileDropzoneProps) {
                   className="input-field py-1.5 text-xs font-semibold bg-slate-800 border-slate-700 text-blue-400 focus:border-blue-500"
                   value={item.platform}
                   onChange={(e) => updatePlatform(index, e.target.value)}
+                  disabled={isLoading}
                 >
                   <option value="MULTI">🌐 Gộp tất cả sảnh (Tự động theo file)</option>
                   <option value="Evolution">Sảnh Evolution Gaming</option>
@@ -90,19 +99,48 @@ export function FileDropzone({ onFilesAccepted }: FileDropzoneProps) {
               </div>
               <button 
                 onClick={() => removeFile(index)}
-                className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-critical transition-colors"
+                disabled={isLoading}
+                className="p-2 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-critical transition-colors disabled:opacity-50"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
           ))}
           
-          <div className="flex justify-end pt-4">
+          {isLoading && (
+            <div className="flex items-center gap-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-blue-400 text-xs animate-pulse">
+              <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+              <span>⚡ Hệ thống đang phân tích cấu trúc cột siêu tốc từ file {items[0]?.file.name}... Vui lòng đợi trong giây lát!</span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-3 pt-4">
+            {onQuickScan && (
+              <button 
+                disabled={isLoading}
+                className={`px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-semibold flex items-center gap-2 transition-all shadow-lg shadow-emerald-900/30 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => onQuickScan(items)}
+              >
+                <span>⚡ Quét Nhanh Trực Tiếp</span>
+              </button>
+            )}
+
             <button 
-              className="btn-primary flex items-center gap-2"
+              disabled={isLoading}
+              className={`btn-primary flex items-center gap-2 ${isLoading ? 'opacity-75 cursor-not-allowed' : ''}`}
               onClick={() => onFilesAccepted(items)}
             >
-              Tiếp tục cấu hình <ArrowRightIcon className="w-4 h-4" />
+              {isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>Đang phân tích cấu trúc...</span>
+                </>
+              ) : (
+                <>
+                  <span>Tiếp tục cấu hình</span>
+                  <ArrowRightIcon className="w-4 h-4" />
+                </>
+              )}
             </button>
           </div>
         </div>
